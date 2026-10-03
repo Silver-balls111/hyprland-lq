@@ -22,6 +22,8 @@ PanelWindow {
     }
     implicitWidth: tooltipLabel.implicitWidth + 22
     implicitHeight: tooltipLabel.implicitHeight + 12
+    exclusionMode: ExclusionMode.Normal
+    exclusiveZone: -1
     margins.left: 0
     margins.top: 0
     color: "transparent"

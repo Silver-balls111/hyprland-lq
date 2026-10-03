@@ -56,26 +56,6 @@ PanelWindow {
         visible = (Popups.active === popupName);
     }
 
-    Timer {
-        id: hoverCloseTimer
-        interval: 450
-        onTriggered: root.evaluateHoverClose(true)
-    }
-
-    function evaluateHoverClose(fire) {
-        if (!root.hoverClose) return;
-        if (root.panelWasHovered && !panelHover.hovered) {
-            if (fire) {
-                Popups.lastDismiss = Date.now();
-                Popups.close();
-            } else {
-                hoverCloseTimer.restart();
-            }
-        } else {
-            hoverCloseTimer.stop();
-        }
-    }
-
     // shield background: click anywhere outside the panel to dismiss
     MouseArea {
         anchors.fill: parent
@@ -92,7 +72,7 @@ PanelWindow {
     Item {
         id: panelArea
         x: root.centerOnAnchor ? root.anchorX - width / 2 : root.anchorX - width
-        y: Theme.barHeight + 6
+        y: Theme.barHeight
         width: root.panelWidth
         height: body.height
 

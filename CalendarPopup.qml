@@ -11,9 +11,6 @@ RicePopup {
 
     // set by Bar.qml
     property var clock: null
-    property var pill: null
-
-    onPanelHoveredChanged: if (root.pill) root.pill.popupHover = panelHovered
 
     // always open on the current month, even if the user browsed away last time
     onVisibleChanged: {

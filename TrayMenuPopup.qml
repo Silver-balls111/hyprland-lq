@@ -21,6 +21,7 @@ PanelWindow {
         menuHandle = handle;
         stack = [];
         anchorX = x;
+        menuList.contentY = 0;
     }
 
     onVisibleChanged: {
@@ -67,7 +68,7 @@ PanelWindow {
     Item {
         id: panelArea
         x: Math.max(8, root.anchorX - width)
-        y: Theme.barHeight + 6
+        y: Theme.barHeight
         width: 280
         height: body.height
 

@@ -6,7 +6,6 @@ Pill {
     id: root
 
     property alias clock: clockObj
-    property bool popupHover: false
     property var tooltipHost: null
 
     readonly property string tip: Qt.formatDateTime(clockObj.date, "ddd, d MMM yyyy")
@@ -61,18 +60,4 @@ Pill {
         onTapped: Popups.toggle("clock")
     }
 
-    Timer {
-        id: closeTimer
-        interval: 420
-        onTriggered: if (!pillHover.hovered && !root.popupHover) Popups.close()
-    }
-
-    function noteHover() {
-        if (!pillHover.hovered && Popups.active === "clock" && !root.popupHover)
-            closeTimer.restart();
-        else
-            closeTimer.stop();
-    }
-
-    onPopupHoverChanged: noteHover()
 }

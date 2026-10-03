@@ -59,7 +59,6 @@ PanelWindow {
 
         CalendarPopup {
             clock: clockPill.clock
-            pill: clockPill
             barWindow: bar
             anchorX: clockPill.x + clockPill.width / 2
             centerOnAnchor: true
