@@ -95,7 +95,7 @@ Pill {
             if (!a) return "No Bluetooth adapter";
             if (!a.enabled) return "Bluetooth off";
             const conn = a.devices.values.filter(d => d.connected);
-            return conn.length > 0 ? conn.map(d => d.name).join("\n") : "Bluetooth";
+            return conn.length > 0 ? conn.map(d => d.name).join("\n") : "Bluetooth on — not connected";
         }
         if (name === "battery") return battTip();
         return "";

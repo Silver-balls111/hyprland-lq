@@ -37,7 +37,8 @@ PanelWindow {
         text = tip;
         const px = item.mapToItem(null, item.width / 2, 0).x;
         const py = (bottomItem || item).mapToItem(null, 0, (bottomItem || item).height).y;
-        root.margins.left = Math.max(8, Math.round(px - root.implicitWidth / 2));
+        const sw = root.screen ? root.screen.width : 1920;
+        root.margins.left = Math.max(8, Math.min(sw - root.implicitWidth - 8, Math.round(px - root.implicitWidth / 2)));
         root.margins.top = Math.round(py) + 6;
     }
     function hide(item) {
