@@ -146,14 +146,27 @@ pill as the `yItem` so every tooltip sits at one height. Toast sits at
   `TypeError: ... is not a function` — the toast still *looks* fine, so only
   the qs log reveals it. History is safe regardless because `Notifs.push`
   snapshots plain JS data, never the QObject.
-- **OSD protocol from the user's volume/brightness scripts** (~/.config/hypr/
-  scripts/volume.sh, brightness.sh): they send `notify-send -e
-  -h string:x-canonical-private-synchronous:<tag> -h int:value:<pct>
-  -i <png from ~/.config/swaync/icons>`. `Notifs.push` detects the sync hint
-  (or `n.transient`) and treats such notifications as OSD feedback: toast
-  replaces the current one, no history, no unread count. `osdTag`/`osdValue`
-  are kept on the entry for the future in-quickshell OSD (brightness/volume
-  slider rendering) — that's the intended replacement for these scripts.
+- **OSD (Osd.qml, 2026-10-04)** — volume/mic/brightness indicator, a port of
+  end-4's ii `OsdValueIndicator`: service-driven, NOT notification-driven.
+  Volume/mic via `Connections` on `Pipewire.defaultAudioSink/Source.audio`
+  (`volumeChanged`/`mutedChanged`), brightness via a 400ms `Timer` polling a
+  `FileView` on `/sys/class/backlight/<dev>/brightness` (kernfs emits no
+  inotify events; device discovered once via `Process ls`; first successful
+  read only calibrates `lastSeenBrightness` — it must not trigger). One
+  visibility flag + "current indicator"; 1000ms hide timer restarted per
+  trigger; `WlrLayer.Overlay` so it shows above the dashboard's Top-layer
+  shield; `armed` flag ignores the Pipewire tracker's initial attach events.
+  Sync-hint notifications (`x-canonical-private-synchronous`) are dropped
+  entirely in `Notifs.push` — the OSD replaces them (a dbus-send test must
+  send the hint as a proper typed dict entry; dbus-send's dict parsing mangles
+  keys — use the python dbus module for tests). `Notifs.osdShowing` makes the
+  toast shift down below the OSD.
+  - Brightness poll is adaptive: 60ms for ~1.5s after any detected change
+    (burst, feels instant during key holds), 400ms baseline.
+  - Volume is hard-capped at 1.0: `onVolumeChanged` writes the sink back down
+    if anything sets it higher; `StatusPill` scroll also caps at 1.0.
+  - OSD volume icon thresholds mirror StatusPill exactly (`muted` /
+    `< 0.5 → volumeLow` / else `volumeHigh`) — keep them in sync.
 - **`Notifs.push` must record history/unread BEFORE the DND / dashboard-open
   early return** — that return only suppresses the toast. Recording after it
   (a real bug for a day) made every DND'd notification vanish: the unread

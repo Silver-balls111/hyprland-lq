@@ -62,6 +62,9 @@ ShellRoot {
     // toast banner (single instance, default screen)
     Toast {}
 
+    // volume/mic/brightness OSD (service-driven, Overlay layer)
+    Osd {}
+
     Variants {
         model: Quickshell.screens
 

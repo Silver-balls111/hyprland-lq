@@ -185,7 +185,7 @@ Pill {
             onWheel: ev => {
                 if (!root.sink?.audio) return;
                 const step = ev.angleDelta.y > 0 ? 0.01 : -0.01;
-                const v = Math.max(0, Math.min(1.5, root.sinkVolume + step));
+                const v = Math.max(0, Math.min(1, root.sinkVolume + step));
                 root.sink.audio.volume = Math.round(v * 100) / 100;
             }
         }

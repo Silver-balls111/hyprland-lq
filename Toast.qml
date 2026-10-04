@@ -24,7 +24,8 @@ PanelWindow {
     implicitWidth: 400
     implicitHeight: Math.max(56, toastCol.implicitHeight + 20)
     margins.right: 10
-    margins.top: Theme.barHeight + 8
+    // shift down below the OSD while one is showing (same corner)
+    margins.top: Theme.barHeight + 8 + (Notifs.osdShowing ? Theme.osdHeight + 8 : 0)
     color: "transparent"
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None

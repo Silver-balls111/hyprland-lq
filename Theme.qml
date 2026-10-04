@@ -43,6 +43,7 @@ QtObject {
     readonly property int barHeight: 46
     readonly property int pillHeight: 36
     readonly property int popupRadius: 18
+    readonly property int osdHeight: 52
 
     // Feed with the contents of a matugen colors.css (@define-color lines).
     // Roles → Theme mapping: pill/popup bodies = secondary (translucent),

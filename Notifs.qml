@@ -9,13 +9,14 @@ QtObject {
     id: root
 
     // newest-first, capped at maxHistory; each entry:
-    // { appName, summary, body, appIcon, urgency, expireTimeout, when, notif,
-    //   osdTag, osdValue } — history never contains OSD-style entries.
+    // { appName, summary, body, appIcon, urgency, expireTimeout, when, notif }
     // `notif` is the live Notification object, only set while a toast is up
     // (used to expire/dismiss it server-side).
     property var history: []
     // current toast entry (null = nothing showing)
     property var toast: null
+    // an OSD (Osd.qml) is currently on screen — the toast shifts below it
+    property bool osdShowing: false
     property bool dnd: false
     // history entries that arrived since the dashboard was last open
     property int unread: 0
@@ -30,13 +31,15 @@ QtObject {
         // keep the server-side object alive past this handler, otherwise the
         // wrapper dies and expire()/dismiss() become dead calls from the timer
         n.tracked = true;
-        // OSD-style notifications (the user's volume/brightness keybind scripts
-        // send notify-send -e -h string:x-canonical-private-synchronous:<tag>
-        // -h int:value:<pct>): transient feedback, replace the current toast,
-        // never stored in history and never counted unread. The tag + value are
-        // kept on the entry for the future in-quickshell OSD.
+        // OSD-style feedback (x-canonical-private-synchronous hint, e.g. the
+        // old volume/brightness scripts' notify-send) is handled natively by
+        // Osd.qml watching the services — drop these duplicates entirely so
+        // they never double up with the real OSD
         const syncTag = n.hints["x-canonical-private-synchronous"];
-        const osd = (typeof syncTag === "string" && syncTag !== "") || n.transient;
+        if (typeof syncTag === "string" && syncTag !== "") {
+            n.expire();
+            return;
+        }
         const entry = {
             appName: n.appName || "",
             summary: n.summary || "",
@@ -45,15 +48,15 @@ QtObject {
             urgency: n.urgency, // NotificationUrgency: 0 Low, 1 Normal, 2 Critical
             expireTimeout: n.expireTimeout, // ms; <=0 means the app gave no timeout
             when: new Date(),
-            notif: null,
-            osdTag: typeof syncTag === "string" ? syncTag : "",
-            osdValue: typeof n.hints["value"] === "number" ? n.hints["value"] : -1
+            notif: null
         };
-        if (!osd) {
-            // history + unread ALWAYS happen for normal notifications — even
-            // under DND or with the dashboard open. The branch below only
-            // suppresses the toast; recording history after it silently lost
-            // every DND'd notification (unread counted, panel empty).
+        // history + unread ALWAYS happen for normal notifications — even
+        // under DND or with the dashboard open. The branch below only
+        // suppresses the toast; recording history after it silently lost
+        // every DND'd notification (unread counted, panel empty).
+        // Transient notifications (apps asking not to be stored) still toast
+        // but skip history/unread.
+        if (!n.transient) {
             root.history = [entry].concat(root.history).slice(0, root.maxHistory);
             if (Popups.active !== "clock") root.unread++;
         }
@@ -61,10 +64,6 @@ QtObject {
             // toast suppressed — expire server-side so nothing lingers
             n.expire();
             return;
-        }
-        if (osd && root.toast && root.toast.notif) {
-            root.toast.notif.expire();
-            root.toast = null;
         }
         entry.notif = n;
         root.toast = entry;

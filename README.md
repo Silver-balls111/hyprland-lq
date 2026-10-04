@@ -53,6 +53,17 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
    hl.bind(mainMod .. " + X", hl.dsp.global("qs-bar:powermenu"))     -- power popup
    hl.bind(mainMod .. " + N", hl.dsp.global("qs-bar:notification"))  -- dashboard
    ```
+   The OSD watches real device state, so volume/brightness keys need no helper
+   scripts — call the tools directly (scripts from a swaync setup are fully
+   optional; volume is capped at 100% by the bar either way):
+   ```lua
+   hl.bind("XF86AudioRaiseVolume",
+       hl.dsp.exec_cmd("wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+"),
+       { locked = true, repeating = true })
+   hl.bind("XF86MonBrightnessUp",
+       hl.dsp.exec_cmd("brightnessctl -q set 5%+"),
+       { locked = true, repeating = true })
+   ```
 
 4. **Layer rules** — the bar's layer namespace is `quickshell:bar` (popups:
    `quickshell:popup`, toast: `quickshell:toast`, tooltips:
@@ -94,7 +105,8 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
 |---|---|
 | Workspaces (1–5+) | Click to switch. Always shows at least 5 slots (extra empty slots create the workspace on click); more appear if you use more. The active workspace's pill widens with the accent fill; a workspace with a window requesting attention is tinted until visited. |
 | Clock pill | Stateful bell + time. The bell mirrors waybar's notification icons: quiet = plain bell, unread notifications = ringing bell (highlighted), DND = bell-sleep variants. Click opens the **dashboard**: month calendar (left) + notifications with a media player card (right). Always opens on the current month; the player card shows track info with prev/play/next when something is playing. Closes on outside click, `Esc`, or re-click. |
-| Notifications | Quickshell is the notification daemon (replaces swaync). Notifications appear as a top-right **toast banner** (2s low / 4s normal / 6s critical, app-supplied timeouts respected) and land in the dashboard's history (last 30, hover shows an ✕, click a row to remove it, `Clear` wipes it). **Do Not Disturb** silences toasts but keeps history. OSD-style notifications (`x-canonical-private-synchronous` hint, e.g. your volume/brightness scripts) replace the current toast and skip history. |
+| Notifications | Quickshell is the notification daemon (replaces swaync). Notifications appear as a top-right **toast banner** (2s low / 4s normal / 6s critical, app-supplied timeouts respected) and land in the dashboard's history (last 30, hover shows an ✕, click a row to remove it, `Clear` wipes it). **Do Not Disturb** silences toasts but keeps history. |
+| OSD | Volume / Microphone / Brightness indicator — a rounded pill at the top-right (icon + name + percentage + animated bar) that pops on any change of the underlying state: your keybinds (`wpctl`, `brightnessctl`, or the old scripts), or the bar's volume scroll. **Volume is hard-capped at 100%** (anything setting it higher is clamped back). Hides 1s after the last change; shows even while the dashboard is open. App-generated OSD-style notifications (`x-canonical-private-synchronous` hint) are dropped so they never double up with the native OSD. |
 | System tray | Real StatusNotifier tray with menus (right-click), primary action (left-click) and scroll actions. Tray menus are keyboard-navigable too: `Tab`/arrows move (skipping separators and greyed-out entries), `Enter` activates or drills into a submenu, `Backspace`/`Left` goes back, `Esc` closes. |
 | Volume | Scroll = ±1%, click = mute/unmute. Mirrors wpctl state. |
 | Mic | Scroll = ±2%, click = mute/unmute. |

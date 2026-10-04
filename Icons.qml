@@ -64,6 +64,7 @@ QtObject {
         "suspend": String.fromCodePoint(0xF04B2),
         "hibernate": String.fromCodePoint(0xE7FC),
         "music": String.fromCodePoint(0xF001),
+        "brightness": String.fromCodePoint(0xF185),
         "play": String.fromCodePoint(0xF04B),
         "pause": String.fromCodePoint(0xF04C),
         // f04d renders as a filled SQUARE in this font (codepoint collision) —
