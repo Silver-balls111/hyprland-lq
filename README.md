@@ -68,12 +68,19 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
 
 4. **Layer rules** — the bar's layer namespace is `quickshell:bar` (popups:
    `quickshell:popup`, toast: `quickshell:toast`, tooltips:
-   `quickshell:tooltip`). Blur is optional, in `window-rules.lua`:
+   `quickshell:tooltip`, wallpaper picker: `quickshell:wallswitch`). Blur and
+   the picker's around-dim are optional, in `window-rules.lua`:
    ```lua
    hl.layer_rule({
        name = "qs:top-bar",
        match = { namespace = "quickshell:bar" },
        blur = true, blur_popups = true, ignore_alpha = 0.5,
+   })
+   -- dims the desktop behind the wallpaper picker (compositor-side)
+   hl.layer_rule({
+       name = "qs:wallswitch-dim",
+       match = { namespace = "quickshell:wallswitch" },
+       dimaround = true,
    })
    ```
    Popups/toasts need no opacity rule — they are opaque by design, and
@@ -115,7 +122,7 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
 | Bluetooth | Click opens a **dropdown**: toggle adapter, up to 5 devices visible with scroll (paired first), click to pair / connect / disconnect. Icon reflects adapter state; hover tooltip lists connected devices. Keyboard: same as Wi-Fi. |
 | Battery | UPower percentage + state icon (charging/discharging sets, same glyphs as the waybar config); hover tooltip shows time remaining. |
 | Power | Click opens **Lock / Log Out / Reboot / Power Off**. Keyboard: `Tab`/arrows or the wlogout letters (`s`/`r`/`u`/`l`/`h`/`o`), `Enter` runs the action, `Esc` closes. |
-| Wallpaper picker | `SUPER+W` opens a **skwd-wall-style picker** floating over the live desktop (no dim): right-leaning slanted slices of every image in `~/Pictures/wallpapers/images`, the selected one enlarged, upright and accent-bordered in a fixed 16:9 frame (starts on the current wallpaper). Scroll / arrow keys / click a slice to preview it centered; click the centered one or press `Enter`/`Space` to apply — `awww` with a random transition, then `matugen` regenerates the whole palette live (requires `[config.wallpaper] set = false` in matugen's config so it never re-applies the image itself). `Esc` or clicking bare desktop closes. Replaces the old rofi `wall-switcher.sh` flow. |
+| Wallpaper picker | `SUPER+W` opens a **skwd-wall-style picker** floating over the live desktop: four right-leaning slanted slices per side of a fixed 16:9 center frame, the selected wallpaper enlarged behind an accent border (starts on the current wallpaper; only the focused one shows its filename chip). Scroll / arrow keys / click a slice to preview it centered; click the centered one or press `Enter`/`Space` to apply — `awww` with a random transition, then `matugen` regenerates the whole palette live (requires `[config.wallpaper] set = false` in matugen's config so it never re-applies the image itself). `Esc` or clicking bare desktop closes. An optional `dimaround` layer rule (see setup step 4) dims the desktop behind it. Replaces the old rofi `wall-switcher.sh` flow. |
 
 All icons are **Nerd Font glyphs** (JetBrains Mono Nerd Font Propo) using the
 same codepoints as `~/.config/waybar/config.jsonc` — battery levels, volume,

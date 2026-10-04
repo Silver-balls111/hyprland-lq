@@ -365,6 +365,22 @@ directly).
   `animateNav && everOpened`** — opens and Home/End must snap, or the first
   open flies across 471 entries (and `enabled` belongs on the `Behavior`,
   NOT on the `NumberAnimation` — "Cannot assign to non-existent property").
+- **Geometry is derived, not fixed pixels** (user-tuned against the
+  reference): `sideSlots = 4` strips per side, `margin = 5%` of screen width
+  of empty desktop at the row ends, `pitch = (scrW/2 - margin - centerW/2) /
+  sideSlots`, `stripW = pitch - gap` — so exactly 4 strips fit between the
+  center frame and the margin on any screen width. `shearK = 0.15` (~8.5°;
+  the first 0.35 was way too slanted per user). Slots beyond `|d| = 4` fade
+  out by 4.5 and hide — maxSlots is 9 (the outermost pair are just invisible
+  teleport targets for recycling). **The dim is NOT in QML**: the user wants
+  the compositor to dim what's behind the picker via a `dimaround` layer
+  rule on namespace `quickshell:wallswitch` (README setup step 4 has the
+  snippet) — keep the QML shield invisible.
+- **Filename chip only on the focused slot** (`visible: wallIdx ===
+  selected`, not a distance gate) — side strips are unnamed like skwd; the
+  selected-slot condition avoids the two-chips-at-midpoint flicker a
+  `|d| < 0.5` gate would give mid-animation, and it's a pure visibility
+  toggle (no image reloads involved).
 - **Keys**: Esc / arrows / `Tab`/`Backtab` / `Home`/`End` / Enter+Space on a
   focus-sink Item via `Keys.onPressed`, PLUS `Keys.onReturnPressed` and
   `Keys.onEnterPressed` — the user reported Enter not applying while Space

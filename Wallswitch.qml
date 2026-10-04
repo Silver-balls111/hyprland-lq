@@ -43,18 +43,24 @@ PanelWindow {
     readonly property var transitions: ["fade", "wipe", "outer", "grow", "slide"]
 
     // ---- geometry (fractions of the screen, tuned on eDP-1 1920x1080 to
-    // match the skwd reference: smaller center, strips reaching the edges) ----
+    // match the skwd reference: relaxed lean, 4 strips per side, desktop
+    // breathing room at the row ends) ----
     // NB: QML property names cannot start with an uppercase letter
     readonly property real scrW: screen ? screen.width : 1920
     readonly property real scrH: screen ? screen.height : 1080
-    readonly property real slotH: Math.round(scrH * 0.48)
-    readonly property real stripW: Math.round(slotH * 0.20)
-    readonly property real gap: Math.round(scrH * 0.014)
+    readonly property int sideSlots: 4          // strips per side of the center
+    readonly property real margin: scrW * 0.05  // empty desktop at the row ends
+    readonly property real slotH: Math.round(scrH * 0.45)
     // FIXED center frame — every wallpaper sits in the same box when centered
     // (non-16:9 ones center-crop, like skwd's fixed frame)
     readonly property real centerW: Math.round(slotH * 16 / 9)
-    readonly property real shearK: 0.35   // |tan| of the lean (~19°)
-    readonly property int maxSlots: 11
+    readonly property real gap: Math.round(scrH * 0.014)
+    // strips sized so `sideSlots` of them fit exactly between the center and
+    // the margin: pitch = (screen/2 - margin - center/2) / sideSlots
+    readonly property real pitch: (scrW / 2 - margin - centerW / 2) / sideSlots
+    readonly property real stripW: Math.round(pitch - gap)
+    readonly property real shearK: 0.15  // |tan| of the lean (~8.5°, relaxed)
+    readonly property int maxSlots: 2 * sideSlots + 1
 
     anchors {
         top: true
@@ -340,8 +346,10 @@ PanelWindow {
             // the strips (skwd's whole plane shares one angle)
             readonly property real shearAmt: root.shearK
 
-            visible: wallIdx >= 0 && ad < 5.6
-            opacity: Math.max(0, Math.min(1, 5.5 - ad))
+            visible: wallIdx >= 0 && ad < 4.6
+            // the row ends at |d| = 4; the 5th slot is never shown — it only
+            // exists as an invisible teleport target for recycling
+            opacity: ad <= 4 ? 1 : Math.max(0, 1 - (ad - 4) * 2)
             z: Math.round(100 - ad * 10)
 
             width: root.centerW + (root.stripW - root.centerW) * t
@@ -349,13 +357,13 @@ PanelWindow {
             x: root.scrW / 2 + (d > 0.001 ? 1 : d < -0.001 ? -1 : 0) * slotOffset(ad) - width / 2
             y: (root.scrH - height) / 2
 
-            // center-to-strip-edge distance for a slot at |d| = tt; the first
-            // strip hugs the center image's edge (like the reference), later
-            // ones step by stripW + gap
+            // center-to-strip distance for a slot at |d| = tt; the first
+            // strip hugs the center image's edge, later ones step by one
+            // pitch (pitch/stripW are derived so sideSlots fit the margin)
             function slotOffset(tt) {
                 const full = root.centerW / 2 + root.gap + root.stripW / 2;
                 if (tt <= 1) return tt * full;
-                return full + (tt - 1) * (root.stripW + root.gap);
+                return full + (tt - 1) * root.pitch;
             }
 
             // center-vs-strip morph target; the center frame is FIXED 16:9
@@ -432,7 +440,9 @@ PanelWindow {
                 color: Qt.rgba(0, 0, 0, 0.55)
                 border.width: 1
                 border.color: Qt.rgba(1, 1, 1, 0.35)
-                visible: slot.ad < 4.6
+                // filename chip only on the focused wallpaper (pure visibility
+                // toggle — no image reloads involved)
+                visible: slot.wallIdx === root.selected
 
                 Text {
                     id: chipText
