@@ -1,5 +1,7 @@
 # quickshell_rice
 
+> Agent/AI sessions: read **[AGENTS.md](AGENTS.md)** first — architecture, quirks and conventions.
+
 A floating pink pill bar for **Arch Linux + Hyprland ≥ 0.56**, built for **Quickshell 0.3.1**.
 Design: workspace pills (left) · clock + bell (center) · status pill (right).
 

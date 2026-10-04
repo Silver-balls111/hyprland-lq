@@ -62,7 +62,6 @@ PanelWindow {
             barWindow: bar
             anchorX: clockPill.x + clockPill.width / 2
             centerOnAnchor: true
-            hoverClose: true
         }
 
         WifiPopup {

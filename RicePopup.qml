@@ -15,15 +15,11 @@ PanelWindow {
     property int anchorX: 0
     // true: panel centered on anchorX; false: panel's right edge at anchorX
     property bool centerOnAnchor: false
-    // calendar-style: close shortly after the mouse is no longer over the panel
-    property bool hoverClose: false
     property int panelWidth: 300
-    // hoverClose only applies after the user has actually hovered the panel
-    // and left it — otherwise the shield mapping under the cursor would close
-    // the popup immediately after opening
-    property bool panelWasHovered: false
-
-    readonly property bool panelHovered: panelHover.hovered
+    // power-menu style: while open, capture ALL keys so letter keybinds work
+    property bool grabKeys: false
+    // forwarded from the focused body so subclasses can implement keybinds
+    signal keyPressed(var event)
 
     anchors {
         top: true
@@ -35,7 +31,7 @@ PanelWindow {
     color: "transparent"
     visible: false
     WlrLayershell.layer: WlrLayer.Top
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+    WlrLayershell.keyboardFocus: root.grabKeys ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand
     WlrLayershell.namespace: "quickshell:rice-popup"
 
     onVisibleChanged: {
@@ -59,12 +55,10 @@ PanelWindow {
     // shield background: click anywhere outside the panel to dismiss
     MouseArea {
         anchors.fill: parent
-        hoverEnabled: root.hoverClose
         onClicked: {
             Popups.lastDismiss = Date.now();
             Popups.close();
         }
-        onContainsMouseChanged: root.evaluateHoverClose(false)
     }
 
     default property alias content: body.data
@@ -88,14 +82,8 @@ PanelWindow {
             focus: true
 
             Keys.onEscapePressed: Popups.close()
+            Keys.onPressed: event => root.keyPressed(event)
         }
 
-        HoverHandler {
-            id: panelHover
-            onHoveredChanged: {
-                if (hovered) root.panelWasHovered = true;
-                root.evaluateHoverClose(false);
-            }
-        }
     }
 }

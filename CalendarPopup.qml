@@ -7,7 +7,6 @@ RicePopup {
     popupName: "clock"
     panelWidth: 300
     centerOnAnchor: true
-    hoverClose: true
 
     // set by Bar.qml
     property var clock: null

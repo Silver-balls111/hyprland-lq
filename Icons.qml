@@ -52,6 +52,10 @@ QtObject {
         "chevronLeft": String.fromCodePoint(0xF0141),
         "chevronRight": String.fromCodePoint(0xF0142),
         "check": String.fromCodePoint(0xF012C),
-        "lock": String.fromCodePoint(0xF033E)
+        "lock": String.fromCodePoint(0xF033E),
+        "logout": String.fromCodePoint(0xF05FD),
+        "restart": String.fromCodePoint(0xF0709),
+        "suspend": String.fromCodePoint(0xF04B2),
+        "hibernate": String.fromCodePoint(0xE7FC)
     }
 }

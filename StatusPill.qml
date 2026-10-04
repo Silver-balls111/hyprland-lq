@@ -268,8 +268,6 @@ Pill {
         spacing: 6
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            width: 30
-            horizontalAlignment: Text.AlignLeft
             text: root.batt ? Math.round(root.batt.percentage * 100) + "%" : ""
             color: Theme.fgMuted
             font.family: Theme.fontFamily

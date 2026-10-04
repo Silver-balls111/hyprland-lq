@@ -11,7 +11,7 @@ Pill {
     // Hyprland >= 0.56 replaced the flat dispatch syntax with a Lua one
     property bool luaIpc: true
 
-    vpadding: 3
+    vpadding: 0
     spacing: 1
     hoverable: false
 
@@ -35,22 +35,29 @@ Pill {
         }
     }
 
+    // Hoisted so delegates can read the edge ids: a Repeater id is not
+    // resolvable from delegates created through the Pill's content alias
+    // (ReferenceError -> isLast silently false).
+    readonly property var wsValues: {
+        const real = [...Hyprland.workspaces.values].filter(w => w.id > 0);
+        const byId = new Map(real.map(w => [w.id, w]));
+        for (let i = 1; i <= root.minCount; i++) {
+            if (!byId.has(i)) byId.set(i, { id: i, name: String(i) });
+        }
+        return [...byId.values()].sort((a, b) => a.id - b.id);
+    }
+
     Repeater {
         model: ScriptModel {
-            values: {
-                const real = [...Hyprland.workspaces.values].filter(w => w.id > 0);
-                const byId = new Map(real.map(w => [w.id, w]));
-                for (let i = 1; i <= root.minCount; i++) {
-                    if (!byId.has(i)) byId.set(i, { id: i, name: String(i) });
-                }
-                return [...byId.values()].sort((a, b) => a.id - b.id);
-            }
+            values: root.wsValues
         }
 
         delegate: Rectangle {
             id: wsCell
 
             required property var modelData
+            readonly property bool isFirst: modelData.id === root.wsValues[0].id
+            readonly property bool isLast: modelData.id === root.wsValues[root.wsValues.length - 1].id
             readonly property bool isActive: Hyprland.focusedWorkspace?.id === modelData.id
             readonly property bool isUrgent: modelData.urgent === true
             readonly property string label: {
@@ -62,13 +69,44 @@ Pill {
             readonly property color idleColor: Qt.rgba(
                 Theme.accentSoft.r, Theme.accentSoft.g, Theme.accentSoft.b, 0)
 
-            width: wsCell.isActive ? Math.max(44, wsLabel.implicitWidth + 44)
-                                   : Math.max(30, wsLabel.implicitWidth + 16)
-            height: 26
-            radius: 13
+            // idle + hover share one width; the ACTIVE cell is wider
+            // (waybar parity). Switching swaps the two widths between cells,
+            // so the pill's total width stays constant for equal labels —
+            // the small fill motion mid-switch is subtle and waybar has it too.
+            width: wsCell.isActive ? Math.max(44, wsLabel.implicitWidth + 36)
+                                   : Math.max(34, wsLabel.implicitWidth + 26)
+            height: Theme.pillHeight
+            radius: height / 2
             color: isActive ? Theme.accent
                  : isUrgent ? Theme.urgent
                  : cellHover.hovered ? Theme.accentSoft : idleColor
+
+            // only the ACTIVE fill bleeds into the pill's hpadding so it
+            // reaches the pill's rounded cap; hover stays number-sized
+            Rectangle {
+                visible: wsCell.isFirst
+                opacity: wsCell.isActive ? 1 : 0
+                Behavior on opacity {
+                    NumberAnimation { duration: 130 }
+                }
+                x: -root.hpadding
+                width: wsCell.height
+                height: wsCell.height
+                radius: width / 2
+                color: wsCell.color
+            }
+            Rectangle {
+                visible: wsCell.isLast
+                opacity: wsCell.isActive ? 1 : 0
+                Behavior on opacity {
+                    NumberAnimation { duration: 130 }
+                }
+                x: wsCell.width - wsCell.height + root.hpadding
+                width: wsCell.height
+                height: wsCell.height
+                radius: width / 2
+                color: wsCell.color
+            }
 
             Behavior on color {
                 ColorAnimation { duration: 130 }
