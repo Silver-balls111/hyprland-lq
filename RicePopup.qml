@@ -79,6 +79,18 @@ PanelWindow {
         width: root.panelWidth
         height: body.height
 
+        // consume clicks that land on panel background / spacing / disabled
+        // buttons so they never reach the shield below — a click inside the
+        // panel must never close the popup (only outside clicks, Esc, or
+        // re-clicking the trigger do). Sibling declared BEFORE body so it sits
+        // under it: plain Rectangles don't accept clicks, so subclass content
+        // above body gets clicks first, and only unconsumed clicks land here.
+        // (Must NOT be a child of body: anchors.fill would feed childrenRect
+        // and loop against the childrenRect-based implicitHeight.)
+        MouseArea {
+            anchors.fill: body
+        }
+
         Rectangle {
             id: body
             width: parent.width

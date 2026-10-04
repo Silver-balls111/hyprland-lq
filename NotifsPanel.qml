@@ -198,7 +198,7 @@ Item {
                     anchors.left: iconChip.right
                     anchors.leftMargin: 9
                     anchors.right: parent.right
-                    anchors.rightMargin: 10
+                    anchors.rightMargin: 30
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 2
 
@@ -219,6 +219,22 @@ Item {
                         color: Theme.fgMuted
                         font.family: Theme.fontFamily
                         font.pixelSize: 10
+                    }
+                }
+
+                // visual-only dismiss affordance — rowMa handles the click
+                // (anywhere on the row removes), so it never flickers on hover
+                NIcon {
+                    anchors.right: parent.right
+                    anchors.rightMargin: 9
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: "xmark"
+                    iconSize: 12
+                    iconColor: Theme.fgMuted
+                    opacity: rowMa.containsMouse ? 1 : 0
+
+                    Behavior on opacity {
+                        NumberAnimation { duration: 120 }
                     }
                 }
 

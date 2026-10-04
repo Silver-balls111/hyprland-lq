@@ -49,10 +49,17 @@ QtObject {
             osdTag: typeof syncTag === "string" ? syncTag : "",
             osdValue: typeof n.hints["value"] === "number" ? n.hints["value"] : -1
         };
+        if (!osd) {
+            // history + unread ALWAYS happen for normal notifications — even
+            // under DND or with the dashboard open. The branch below only
+            // suppresses the toast; recording history after it silently lost
+            // every DND'd notification (unread counted, panel empty).
+            root.history = [entry].concat(root.history).slice(0, root.maxHistory);
+            if (Popups.active !== "clock") root.unread++;
+        }
         if (root.dnd || Popups.active === "clock") {
-            // captured for history only — expire server-side so nothing lingers
+            // toast suppressed — expire server-side so nothing lingers
             n.expire();
-            if (!osd) root.unread++;
             return;
         }
         if (osd && root.toast && root.toast.notif) {
@@ -61,10 +68,6 @@ QtObject {
         }
         entry.notif = n;
         root.toast = entry;
-        if (!osd) {
-            root.history = [entry].concat(root.history).slice(0, root.maxHistory);
-            root.unread++;
-        }
     }
 
     function remove(index) {

@@ -56,6 +56,7 @@ QtObject {
         "power": String.fromCodePoint(0xF0425),
         "chevronLeft": String.fromCodePoint(0xF0141),
         "chevronRight": String.fromCodePoint(0xF0142),
+        "xmark": String.fromCodePoint(0xF00D),
         "check": String.fromCodePoint(0xF012C),
         "lock": String.fromCodePoint(0xF033E),
         "logout": String.fromCodePoint(0xF05FD),

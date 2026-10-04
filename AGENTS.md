@@ -33,7 +33,7 @@ the config on every file save — you do not need to restart to test QML edits).
 | `PowerPopup.qml` | Power Off / Reboot / Suspend / Log Out / Hibernate / Lock (6 rows, 5 visible + scroll). Commands + letter keybinds mirror `~/.config/wlogout/layout`; grabs exclusive keyboard while open (`grabKeys`). |
 | `DashPopup.qml` | Clock-click dashboard (replaces the old `CalendarPopup`): calendar column (left, 310px) + hairline divider + notifications column (right), fixed `panelHeight` 540 so a playing media card only takes space from the list. `popupName: "clock"`, anchored centered on the clock pill. |
 | `CalendarPanel.qml` | Month grid + weekday/date header, extracted verbatim from the old `CalendarPopup`; `resetMonth()` called by DashPopup on every open. |
-| `NotifsPanel.qml` | Right column of the dashboard: MPRIS player card(s) docked on top (`Mpris.players` filtered to non-stopped), notification history ListView (click row = remove), bell "No Notifications" empty state, footer with DND `Toggle` + `Clear`. |
+| `NotifsPanel.qml` | Right column of the dashboard: MPRIS player card(s) docked on top (`Mpris.players` filtered to non-stopped), notification history ListView (rows show a hover ✕ — visual only, the row MouseArea handles the click and removes the entry), bell "No Notifications" empty state, footer with DND `Toggle` + `Clear`. |
 | `Notifs.qml` (singleton) | Notification history (plain JS snapshots, capped 30, newest first), `dnd`, current `toast` entry, `push/remove/clearAll/closeToast`. `push` sets `n.tracked = true` — see notification gotcha. |
 | `Toast.qml` | Top-right toast banner (small mapped-only window, TooltipWindow pattern). Timer mirrors the user's old swaync timings: 2s low / 4s normal / 6s critical; app-supplied `expireTimeout` (ms) wins when > 0, clamped 2–15s. Hidden while DND or the dashboard is open. Click = dismiss. |
 | `TrayMenuPopup.qml` | Themed DBusMenu renderer for tray items (`QsMenuOpener`), one submenu drill-down level with a Back row. Scroll position resets on every open. |
@@ -62,6 +62,12 @@ requests, and `WifiSecurityType.toString(i)`-style calls reveal enum names.
   coordinates and closes the popup.
 - All popups share the `Popups` singleton: opening one closes the others;
   re-clicking the same trigger closes it. Keep `TrayMenuPopup` wired in too.
+- Clicks INSIDE the panel never close it: `body` in `RicePopup` holds a plain
+  full-size MouseArea (the "swallower") declared before the content alias, so
+  background/spacing/disabled-control clicks are consumed instead of falling
+  through to the shield. Before it existed, clicking a disabled media button
+  or any empty area closed the popup (the user caught this). Subclass content
+  lands above the swallower, so real controls still get their clicks.
 - Anchoring data (`wifiRightX` etc. on StatusPill, `anchorX` on Bar) is easy to
   drop during rewrites — a NaN anchorX makes a popup open *invisibly*.
 - Hover-out auto-close was removed on purpose: it fired when the shield mapped
@@ -147,6 +153,10 @@ pill as the `yItem` so every tooltip sits at one height. Toast sits at
   replaces the current one, no history, no unread count. `osdTag`/`osdValue`
   are kept on the entry for the future in-quickshell OSD (brightness/volume
   slider rendering) — that's the intended replacement for these scripts.
+- **`Notifs.push` must record history/unread BEFORE the DND / dashboard-open
+  early return** — that return only suppresses the toast. Recording after it
+  (a real bug for a day) made every DND'd notification vanish: the unread
+  counter ticked and the bell changed, but the panel stayed empty forever.
 - The server lives at shell root, not inside `Variants`: one DBus owner, and
   one `Toast`, regardless of screen count.
 - `Notifs.push` drops the toast (expires immediately) when DND is on or the
@@ -170,7 +180,7 @@ alignment), not the ⏻ text char. The bell set (`bell`/`bellRing`/`bellDnd`/
 `bellSleep`) comes from the `custom/notification` module's format-icons:
 none F009C / unread F116B / dnd+unread F00A0 / dnd+quiet F0A93. Media transport
 glyphs are NOT in the waybar config: play f04b, pause f04c, prev f049 (◀◀),
-next f04e (▶▶), music f001.
+next f04e (▶▶), music f001, xmark f00d.
 `Icons.yOffset(name)` holds pixel corrections measured by rendering glyphs
 against JetBrains Mono text — update it if you add glyphs. BT device rows all
 use the plain bluetooth glyph (matches waybar).
