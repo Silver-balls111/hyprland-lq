@@ -61,8 +61,7 @@ RicePopup {
                 text: "Wi-Fi"
                 color: Theme.fg
                 font.family: Theme.fontFamily
-                font.pixelSize: 14
-                font.weight: Font.Bold
+                font.pixelSize: Theme.textSize
             }
             Toggle {
                 Layout.alignment: Qt.AlignVCenter
@@ -91,8 +90,7 @@ RicePopup {
                     elide: Text.ElideRight
                     color: Theme.fg
                     font.family: Theme.fontFamily
-                    font.pixelSize: 11
-                    font.weight: Font.DemiBold
+                    font.pixelSize: Theme.textSize
                 }
                 RowLayout {
                     Layout.fillWidth: true
@@ -106,7 +104,7 @@ RicePopup {
                         placeholderTextColor: Theme.fgMuted
                         color: Theme.fg
                         font.family: Theme.fontFamily
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.textSize
                         background: Rectangle {
                             radius: 9
                             color: "#ffffff"
@@ -125,8 +123,7 @@ RicePopup {
                             text: "Connect"
                             color: Theme.fg
                             font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            font.weight: Font.Bold
+                            font.pixelSize: Theme.textSize
                         }
                         MouseArea {
                             anchors.fill: parent
@@ -150,7 +147,7 @@ RicePopup {
             text: Networking.wifiHardwareEnabled ? "No Wi-Fi device found" : "Wi-Fi is hard blocked (rfkill)"
             color: Theme.fgMuted
             font.family: Theme.fontFamily
-            font.pixelSize: 12
+            font.pixelSize: Theme.textSize
             horizontalAlignment: Text.AlignHCenter
         }
         Text {
@@ -159,7 +156,7 @@ RicePopup {
             text: "Wi-Fi is off"
             color: Theme.fgMuted
             font.family: Theme.fontFamily
-            font.pixelSize: 12
+            font.pixelSize: Theme.textSize
             horizontalAlignment: Text.AlignHCenter
         }
 
@@ -224,8 +221,7 @@ RicePopup {
                     color: Theme.fg
                     opacity: netRow.modelData.connected ? 1 : 0.85
                     font.family: Theme.fontFamily
-                    font.pixelSize: 12
-                    font.weight: netRow.modelData.connected ? Font.Bold : Font.Medium
+                    font.pixelSize: Theme.textSize
                 }
 
                 Row {

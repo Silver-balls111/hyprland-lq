@@ -16,7 +16,7 @@ PanelWindow {
     implicitHeight: Theme.barHeight
     color: "transparent"
     WlrLayershell.layer: WlrLayer.Top
-    WlrLayershell.namespace: "quickshell:rice-bar"
+    WlrLayershell.namespace: "quickshell:bar"
 
     function showTooltip(item, text, yItem) {
         tooltipWindow.show(item, text, yItem);
@@ -34,7 +34,7 @@ PanelWindow {
         Workspaces {
             id: wsPill
             anchors.top: parent.top
-            anchors.topMargin: 7
+            anchors.topMargin: 5
             anchors.left: parent.left
             anchors.leftMargin: 14
         }
@@ -43,7 +43,7 @@ PanelWindow {
             id: clockPill
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
-            anchors.topMargin: 7
+            anchors.topMargin: 5
             tooltipHost: bar
         }
 
@@ -52,7 +52,7 @@ PanelWindow {
             anchors.right: parent.right
             anchors.rightMargin: 14
             anchors.top: parent.top
-            anchors.topMargin: 7
+            anchors.topMargin: 5
             tooltipHost: bar
             barWindow: bar
         }

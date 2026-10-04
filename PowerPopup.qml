@@ -77,8 +77,7 @@ RicePopup {
                     text: actionRow.modelData.label
                     color: actionRow.modelData.label === "Power Off" ? Theme.danger : Theme.fg
                     font.family: Theme.fontFamily
-                    font.pixelSize: 12
-                    font.weight: Font.DemiBold
+                    font.pixelSize: Theme.textSize
                 }
             }
 

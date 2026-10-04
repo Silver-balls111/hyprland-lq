@@ -30,7 +30,7 @@ Item {
                 readonly property var player: modelData
 
                 Layout.fillWidth: true
-                height: 68
+                height: 76
                 radius: 12
                 color: Theme.rowHover
 
@@ -75,8 +75,7 @@ Item {
                         elide: Text.ElideRight
                         color: Theme.fgMuted
                         font.family: Theme.fontFamily
-                        font.pixelSize: 9
-                        font.weight: Font.DemiBold
+                        font.pixelSize: Theme.textSize
                     }
                     Text {
                         width: parent.width
@@ -84,8 +83,7 @@ Item {
                         elide: Text.ElideRight
                         color: Theme.fg
                         font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        font.weight: Font.Bold
+                        font.pixelSize: Theme.textSize
                     }
                     Text {
                         width: parent.width
@@ -94,7 +92,7 @@ Item {
                         elide: Text.ElideRight
                         color: Theme.fgMuted
                         font.family: Theme.fontFamily
-                        font.pixelSize: 10
+                        font.pixelSize: Theme.textSize
                     }
                 }
 
@@ -172,7 +170,7 @@ Item {
                 required property int index
 
                 width: notifList.width
-                height: 44
+                height: 48
                 radius: 12
                 color: rowMa.containsMouse ? Theme.rowHover : "transparent"
 
@@ -208,8 +206,7 @@ Item {
                         elide: Text.ElideRight
                         color: notifRow.modelData.urgency === 2 ? Theme.danger : Theme.fg
                         font.family: Theme.fontFamily
-                        font.pixelSize: 11
-                        font.weight: Font.DemiBold
+                        font.pixelSize: Theme.textSize
                     }
                     Text {
                         width: parent.width
@@ -218,7 +215,7 @@ Item {
                         elide: Text.ElideRight
                         color: Theme.fgMuted
                         font.family: Theme.fontFamily
-                        font.pixelSize: 10
+                        font.pixelSize: Theme.textSize
                     }
                 }
 
@@ -269,8 +266,7 @@ Item {
                     text: "No Notifications"
                     color: Theme.fgMuted
                     font.family: Theme.fontFamily
-                    font.pixelSize: 12
-                    font.weight: Font.DemiBold
+                    font.pixelSize: Theme.textSize
                 }
             }
         }
@@ -284,8 +280,7 @@ Item {
                 text: "Do Not Disturb"
                 color: Theme.fg
                 font.family: Theme.fontFamily
-                font.pixelSize: 11
-                font.weight: Font.DemiBold
+                font.pixelSize: Theme.textSize
             }
             Toggle {
                 Layout.alignment: Qt.AlignVCenter
@@ -308,8 +303,7 @@ Item {
                     text: "Clear"
                     color: Theme.fg
                     font.family: Theme.fontFamily
-                    font.pixelSize: 11
-                    font.weight: Font.Bold
+                    font.pixelSize: Theme.textSize
                 }
                 MouseArea {
                     id: clearMa

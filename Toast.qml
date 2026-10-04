@@ -28,7 +28,7 @@ PanelWindow {
     color: "transparent"
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    WlrLayershell.namespace: "quickshell:rice-toast"
+    WlrLayershell.namespace: "quickshell:toast"
 
     Timer {
         id: toastTimer
@@ -89,8 +89,7 @@ PanelWindow {
                 visible: text !== ""
                 color: Theme.fgMuted
                 font.family: Theme.fontFamily
-                font.pixelSize: 9
-                font.weight: Font.DemiBold
+                font.pixelSize: Theme.textSize
             }
             Text {
                 width: parent.width
@@ -98,8 +97,7 @@ PanelWindow {
                 elide: Text.ElideRight
                 color: root.entry && root.entry.urgency === 2 ? Theme.danger : Theme.fg
                 font.family: Theme.fontFamily
-                font.pixelSize: 12
-                font.weight: Font.Bold
+                font.pixelSize: Theme.textSize
             }
             Text {
                 width: parent.width
@@ -108,7 +106,7 @@ PanelWindow {
                 visible: text !== ""
                 color: Theme.fgMuted
                 font.family: Theme.fontFamily
-                font.pixelSize: 10
+                font.pixelSize: Theme.textSize
             }
         }
 

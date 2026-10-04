@@ -175,8 +175,7 @@ Pill {
             text: Math.round(root.sinkVolume * 100) + "%"
             color: Theme.fgMuted
             font.family: Theme.fontFamily
-            font.pixelSize: 13
-            font.weight: Font.DemiBold
+            font.pixelSize: Theme.textSize
         }
         TapHandler {
             onTapped: if (root.sink?.audio) root.sink.audio.muted = !root.sinkMuted
@@ -271,8 +270,7 @@ Pill {
             text: root.batt ? Math.round(root.batt.percentage * 100) + "%" : ""
             color: Theme.fgMuted
             font.family: Theme.fontFamily
-            font.pixelSize: 13
-            font.weight: Font.DemiBold
+            font.pixelSize: Theme.textSize
         }
         NIcon {
             anchors.verticalCenter: parent.verticalCenter

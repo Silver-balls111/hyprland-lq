@@ -2,40 +2,99 @@
 
 > Agent/AI sessions: read **[AGENTS.md](AGENTS.md)** first — architecture, quirks and conventions.
 
-A floating pink pill bar for **Arch Linux + Hyprland ≥ 0.56**, built for **Quickshell 0.3.1**.
-Design: workspace pills (left) · clock + bell (center) · status pill (right).
+A floating pill bar for **Arch Linux + Hyprland ≥ 0.56**, built for **Quickshell 0.3.1**.
+Design: workspace pills (left) · stateful bell + clock (center) · status pill (right).
+Colors are not hardcoded — matugen recolors the whole bar live from the wallpaper
+(pink is the fallback palette).
 
 > Hyprland 0.56 replaced the IPC dispatch syntax with Lua (`hl.dsp.*`). This bar
 > sends the new syntax and falls back to the old one on Hyprland < 0.56
 > (auto-detected via `hyprctl version` at startup).
 
-## Run
+## Dependencies
 
-```sh
-qs -p ~/Documents/Dev/quickshell_rice/shell.qml
-```
+| Package | Why |
+|---|---|
+| `quickshell` 0.3.1 | The shell runtime (`qs`) |
+| `hyprland` ≥ 0.56 | Window manager (Lua config) |
+| `ttf-jetbrains-mono-nerd` | All icon glyphs (Nerd Font Propo) |
+| `ttf-rubik-vf` | All text (variable weight) |
+| `matugen` + `awww` | Palette generation from the wallpaper |
+| `networkmanager` | Wi-Fi module |
+| `upower` | Battery module |
+| `pipewire` + `wireplumber` | Volume/mic modules |
+| `bluez` | Bluetooth module |
 
-Or register it as a named config:
+An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card appear.
 
-```sh
-mkdir -p ~/.config/quickshell
-ln -s ~/Documents/Dev/quickshell_rice ~/.config/quickshell/rice
-qs -c rice
-```
+## Setup in a fresh Hyprland session
 
-Autostart with Hyprland — add to `~/.config/hypr/hyprland.conf`:
+1. **Get the bar running**
+   ```sh
+   qs -p ~/Documents/Dev/quickshell_rice/shell.qml
+   ```
+   or register it as a named config once, then use `qs -c topbar`:
+   ```sh
+   mkdir -p ~/.config/quickshell
+   ln -s ~/Documents/Dev/quickshell_rice ~/.config/quickshell/rice
+   qs -c topbar
+   ```
+   Quickshell hot-reloads on every file save — tweaking QML needs no restart.
 
-```ini
-exec-once = qs -c rice        # or: qs -p ~/Documents/Dev/quickshell_rice/shell.qml
-```
+2. **Autostart** — in `~/.config/hypr/config/autostart.lua` (replacing any
+   swaync/waybar lines):
+   ```lua
+   hl.exec_cmd("qs -c topbar")
+   ```
+
+3. **Keybinds** — in `~/.config/hypr/config/keybinds.lua` (the bar registers
+   two global shortcuts under appid `qs-bar`):
+   ```lua
+   hl.bind(mainMod .. " + X", hl.dsp.global("qs-bar:powermenu"))     -- power popup
+   hl.bind(mainMod .. " + N", hl.dsp.global("qs-bar:notification"))  -- dashboard
+   ```
+
+4. **Layer rules** — the bar's layer namespace is `quickshell:bar` (popups:
+   `quickshell:popup`, toast: `quickshell:toast`, tooltips:
+   `quickshell:tooltip`). Blur is optional, in `window-rules.lua`:
+   ```lua
+   hl.layer_rule({
+       name = "qs:top-bar",
+       match = { namespace = "quickshell:bar" },
+       blur = true, blur_popups = true, ignore_alpha = 0.5,
+   })
+   ```
+   Popups/toasts need no opacity rule — they are opaque by design, and
+   `hl.layer_rule` has no `opacity` field anyway.
+
+5. **Palette (matugen)** — `~/.config/matugen/config.toml` must generate the
+   colors file the bar watches:
+   ```toml
+   [templates.waybar-colors]
+   input_path = '~/.config/matugen/templates/colors.css'
+   output_path = '~/.config/waybar/colors.css'
+   ```
+   No `post_hook` needed — the bar watches the file and recolors live. Run
+   matugen once against your wallpaper (`matugen image <wallpaper>` or your
+   usual wallpaper-switch keybind); until then the fallback pink palette shows.
+
+6. **Notifications** — this bar **is** the notification daemon (toasts +
+   dashboard history). Make sure no other daemon autostarts: remove `swaync`,
+   `dunst`, `mako`, `fnott` from autostart. If toasts ever stop appearing,
+   check who owns the DBus name — `busctl --user list | grep
+   freedesktop.Notifications` — and kill the other owner; quickshell
+   re-registers automatically. If a GNOME session is ever open, its standalone
+   notification daemon steals this name (guarded by
+   `~/.config/dbus-1/services/org.gnome.Shell.Notifications.service` with
+   `Exec=/bin/false`).
 
 ## Features
 
 | Element | Behavior |
 |---|---|
-| Workspaces (1–5+) | Click to switch. Always shows at least 5 slots (extra empty slots create the workspace on click); more appear if you use more. The active workspace's pill widens with the pink fill; a workspace with a window requesting attention is tinted orange until visited. |
+| Workspaces (1–5+) | Click to switch. Always shows at least 5 slots (extra empty slots create the workspace on click); more appear if you use more. The active workspace's pill widens with the accent fill; a workspace with a window requesting attention is tinted until visited. |
 | Clock pill | Stateful bell + time. The bell mirrors waybar's notification icons: quiet = plain bell, unread notifications = ringing bell (highlighted), DND = bell-sleep variants. Click opens the **dashboard**: month calendar (left) + notifications with a media player card (right). Always opens on the current month; the player card shows track info with prev/play/next when something is playing. Closes on outside click, `Esc`, or re-click. |
-| Notifications | Quickshell is the notification daemon (replaces swaync). Notifications appear as a top-right **toast banner** (2s low / 4s normal / 6s critical, app-supplied timeouts respected) and land in the dashboard's history (last 30, click a row to remove it, `Clear` wipes it). **Do Not Disturb** silences toasts but keeps history. Toggle the dashboard from a keybind via the `qs-bar:notification` global shortcut (e.g. `mainMod + N`). |
+| Notifications | Quickshell is the notification daemon (replaces swaync). Notifications appear as a top-right **toast banner** (2s low / 4s normal / 6s critical, app-supplied timeouts respected) and land in the dashboard's history (last 30, hover shows an ✕, click a row to remove it, `Clear` wipes it). **Do Not Disturb** silences toasts but keeps history. OSD-style notifications (`x-canonical-private-synchronous` hint, e.g. your volume/brightness scripts) replace the current toast and skip history. |
 | System tray | Real StatusNotifier tray with menus (right-click), primary action (left-click) and scroll actions. |
 | Volume | Scroll = ±1%, click = mute/unmute. Mirrors wpctl state. |
 | Mic | Scroll = ±2%, click = mute/unmute. |
@@ -50,18 +109,27 @@ mic, wifi and bluetooth icons change with state exactly like waybar's
 `format-icons`. Status items have hover tooltips. Popups are layer-shell
 "shield" windows that start below the bar (the bar stays clickable while a
 popup is open): clicking anywhere outside the panel closes the popup, and
-clicking a bar pill toggles it directly.
+clicking a bar pill toggles it directly. Clicks inside a panel never close it.
 
-## Tweaks
+## Tweaking — which file controls what
 
-- Colors, font, sizes → `Theme.qml`
-- Icon set (Canvas-drawn, no fonts needed) → `Icons.qml`
-- Minimum workspace slots → `minCount` in `Workspaces.qml`
-- Calendar hover open/close delays → `openTimer` / `closeTimer` in `ClockPill.qml`
-- Power menu commands → `PowerPopup.qml`
-- Toast banner timings / width, history size, DND → `Toast.qml` / `Notifs.qml`
-
-All icon glyphs live in `Icons.qml` (Nerd Font codepoints, rendered as text —
-no Canvas or icon theme involved). Colors → `Theme.qml`; minimum workspace
-slots → `minCount` in `Workspaces.qml`; calendar hover delays → `ClockPill.qml`;
-power menu commands → `PowerPopup.qml`.
+| File | Controls |
+|---|---|
+| `Theme.qml` | **Font family** (`fontFamily`, Rubik), **the single text size** (`textSize`, 14.5 — every non-icon text uses it), icon font (`nerdFont`), fallback palette colors, the matugen role → bar-color mapping (`applyPaletteCss`), metrics (`barHeight`, `pillHeight`, `popupRadius`) |
+| `Icons.qml` | Nerd Font glyph map (add glyphs here + a `yOffsets` entry if it sits off-center), battery icon sets |
+| `shell.qml` | Global shortcuts (`powermenu`, `notification`), palette file path (`FileView`), notification daemon capabilities, toast instantiation |
+| `Bar.qml` | Pill layout and popup anchoring |
+| `Workspaces.qml` | Minimum slots (`minCount`), idle/active widths, urgent tint |
+| `ClockPill.qml` | Bell states, time format, date tooltip |
+| `StatusPill.qml` | Tray, volume/mic scroll steps, wifi/bt/battery/power behavior and tooltips |
+| `DashPopup.qml` | Dashboard size (`panelWidth`, `panelHeight`) and column layout |
+| `CalendarPanel.qml` | Calendar rendering (grid, header, month nav) |
+| `NotifsPanel.qml` | Media card, notification rows (hover ✕), empty state, DND + Clear footer |
+| `Notifs.qml` | History size cap (30), unread/DND logic, OSD-style handling |
+| `Toast.qml` | Toast width, position, per-urgency timings |
+| `RicePopup.qml` | Shared popup shell: anchoring/clamping, panel sizes, close behavior, click swallowing |
+| `WifiPopup.qml` / `BluetoothPopup.qml` | Per-popup list behavior, password prompt |
+| `PowerPopup.qml` | Power actions + commands |
+| `Popups.qml` | Which popup is open (exclusivity), outside-click toggle guard |
+| `TooltipWindow.qml` / `TrayMenuPopup.qml` | Tooltip rendering / tray menu theming |
+| `NIcon.qml` / `Toggle.qml` / `SignalBars.qml` / `Pill.qml` | Primitives: icon sizing, switches, signal bars, pill shape |

@@ -7,12 +7,13 @@ conventions.
 
 ## What this is
 
-A floating pink "pill" status bar for **Arch Linux + Hyprland ≥ 0.56**, built
-for **Quickshell 0.3.1** (QML). Layout: workspaces (left), clock + calendar
-(center), tray/volume/mic/wifi/bluetooth/battery/power (right). The design and
-iconography deliberately mirror the user's waybar setup —
-`~/.config/waybar/config.jsonc` is the reference for Nerd Font glyph codepoints
-and per-state icon behavior.
+A floating pill bar for **Arch Linux + Hyprland ≥ 0.56**, built for
+**Quickshell 0.3.1** (QML). Layout: workspaces (left), clock + bell (center),
+tray/volume/mic/wifi/bluetooth/battery/power (right). Colors are not
+hardcoded — the palette is recolored live from the wallpaper via matugen
+(defaults = the original pink rice). The design and iconography mirror the
+user's waybar setup — `~/.config/waybar/config.jsonc` is the reference for
+Nerd Font glyph codepoints and per-state icon behavior.
 
 Run: `qs -p ~/Documents/Dev/quickshell_rice/shell.qml` (Quickshell hot-reloads
 the config on every file save — you do not need to restart to test QML edits).
@@ -40,7 +41,7 @@ the config on every file save — you do not need to restart to test QML edits).
 | `TooltipWindow.qml` | Small floating window rendering ONE hover tooltip; positioned via layer-shell margins. Only mapped while showing. |
 | `NIcon.qml` | Fixed-square `Text` rendering one Nerd Font glyph from `Icons`. |
 | `Icons.qml` (singleton) | Glyph codepoint map + `batteryGlyph(level, charging)` + per-glyph `yOffset()` vertical corrections. |
-| `Theme.qml` (singleton) | All colors, fonts (`fontFamily` = JetBrains Mono, `nerdFont` = JetBrains Mono Nerd Font Propo), metrics. |
+| `Theme.qml` (singleton) | Fonts (`fontFamily` = Rubik for all text, `nerdFont` = JetBrains Mono Nerd Font Propo for glyphs), the single `textSize` token (14.5 — every non-icon Text uses it, nothing bold), metrics, and the palette: color properties with pink-rice defaults that `applyPaletteCss()` overlays from matugen (see palette gotcha). |
 | `Pill.qml` | Base rounded pill; declared children go into an inner Row. `rowX` exposed for popup anchoring. |
 | `SignalBars.qml`, `Toggle.qml` | Wifi signal bars, on/off switch (pure QML, no Controls styling). |
 | `qmldir` | **Every** component must be listed here (singletons + types) — see gotchas. |
@@ -170,7 +171,54 @@ pill as the `yItem` so every tooltip sits at one height. Toast sits at
   failure happened ONLY inside the agent's exec shell — its library environment
   differs from the user's session, so don't conclude "tool X is broken
   system-wide" from agent-shell failures. To send test notifications from the
-  agent shell, use `dbus-send` against org.freedesktop.Notifications instead.
+  agent shell, use `dbus-send` against org.freedesktop.Notifications instead
+  (or the python dbus module, which is installed).
+- **`hyprctl reload` re-runs `autostart.lua`** — every `hl.exec_cmd` fires
+  again. While swaync is still in that file, a mere config reload respawns it
+  and it steals `org.freedesktop.Notifications` back; kill it and quickshell
+  re-registers on its own.
+
+### Layer surfaces: namespaces, opacity, error banners (2026-10-04)
+- Layer namespaces: `quickshell:bar` / `quickshell:popup` / `quickshell:toast` /
+  `quickshell:tooltip` (renamed away from "rice-*"; the user's
+  `window-rules.lua` blur rule matches `quickshell:bar`). The named qs config
+  is `~/.config/quickshell/topbar` → `qs -c topbar`.
+- **`decoration active/inactive_opacity` does NOT apply to layer surfaces** —
+  no layerrule needed for opacity, and `hl.layer_rule` has NO `opacity` field
+  anyway ("unknown field 'opacity'" config error). Popup/toast/tooltip opacity
+  comes purely from `Theme.popupBg` (alpha 1.0 since 2026-10-04); verified by
+  pixel: toast background == palette `secondary` exactly, over a dark window.
+- **A Hyprland config error displaces the bar**: config-error banners have an
+  exclusive zone, so `hyprctl layers` showing the bar at y≠0 means "check your
+  hyprland config for errors", not "check the bar". Fixing the config and
+  reloading moves it back to y=0.
+- Pills are a uniform fixed `Theme.pillHeight` (36) set in `Pill.qml` itself
+  (clock/status pills previously content-sized and drifted apart from the
+  workspaces pill), centered via 5px top margins in the 46px bar.
+
+### Palette is matugen-driven + fonts are uniform (2026-10-04)
+- `shell.qml` hosts a `FileView` watching `~/.config/waybar/colors.css` (the
+  matugen template output waybar consumed). Chain: `watchChanges: true` →
+  `onFileChanged: reload()` → `onLoaded: Theme.applyPaletteCss(text())` →
+  Theme color properties update → every binding follows. Verified live with
+  BOTH write styles (in-place and sed -i rename) — pixel-sampled transitions.
+- **FileView traps**: the public `text` is a FUNCTION that shadows the
+  internal property (`text()` — passing bare `text` hands the parser a
+  function object and it silently matches nothing); `watchChanges` fires
+  `fileChanged` but does NOT re-read by itself — call `reload()`; and never
+  declare two `onFileChanged`/`onLoaded` handlers (QML: "Property value set
+  multiple times" → whole config fails to load while the old engine keeps
+  running, which makes every later edit look like it "did nothing").
+- Role mapping in `applyPaletteCss`: `secondary` → pillBg/popupBg
+  (translucent), `secondary_fixed` → pillHover/accent/accentSoft,
+  `on_secondary` → fg, `error` → urgent, `error_container` → danger
+  (dark tone, readable as text on light pills). Derived tones (fgMuted,
+  track, divider, border, rowHover, inputBg) stay formulaic on top of the
+  roles — don't give them matugen roles. If the waybar directory is ever
+  deleted, point the template output elsewhere and update the path.
+- All non-icon text: `Theme.textSize` (14.5) in Rubik, **no font.weight
+  anywhere** (single rule, mirrors the waybar CSS). Only NIcon sizes differ.
+  Icon glyphs remain the nerd font via `Theme.nerdFont`.
 
 ### Icons are Nerd Font glyphs, not fonts-of-opportunity
 All codepoints in `Icons.qml` were taken verbatim from the user's waybar config

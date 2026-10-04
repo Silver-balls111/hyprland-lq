@@ -29,7 +29,7 @@ PanelWindow {
     color: "transparent"
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    WlrLayershell.namespace: "quickshell:rice-tooltip"
+    WlrLayershell.namespace: "quickshell:tooltip"
 
     function show(item, tip, bottomItem) {
         anchorItem = item;
@@ -63,8 +63,7 @@ PanelWindow {
             text: root.text
             color: Theme.fg
             font.family: Theme.fontFamily
-            font.pixelSize: 11
-            font.weight: Font.DemiBold
+            font.pixelSize: Theme.textSize
         }
     }
 }

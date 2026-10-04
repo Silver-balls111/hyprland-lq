@@ -121,8 +121,7 @@ Pill {
                 text: wsCell.label
                 color: Theme.fg
                 font.family: Theme.fontFamily
-                font.pixelSize: 14
-                font.weight: Font.DemiBold
+                font.pixelSize: Theme.textSize
             }
 
             HoverHandler {

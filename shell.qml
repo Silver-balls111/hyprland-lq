@@ -2,6 +2,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
+import Quickshell.Io
 import Quickshell.Services.Notifications
 
 ShellRoot {
@@ -40,6 +41,22 @@ ShellRoot {
         persistenceSupported: true
 
         onNotification: notification => Notifs.push(notification)
+    }
+
+    // Palette overlay: reads the matugen-generated colors.css (the same file
+    // waybar consumed) and feeds Theme; watchChanges re-applies it live on
+    // every wallpaper change (matugen regenerates the file).
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/waybar/colors.css"
+        watchChanges: true
+        blockLoading: true
+        printErrors: true
+        // NB: FileView's public `text` is a FUNCTION (it shadows the internal
+        // property) — call it, or you hand the parser a function object and it
+        // silently finds no colors. watchChanges alone only fires fileChanged
+        // without re-reading — reload() explicitly, then onLoaded re-applies.
+        onFileChanged: reload()
+        onLoaded: Theme.applyPaletteCss(text())
     }
 
     // toast banner (single instance, default screen)

@@ -34,7 +34,7 @@ PanelWindow {
     visible: false
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: root.grabKeys ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand
-    WlrLayershell.namespace: "quickshell:rice-popup"
+    WlrLayershell.namespace: "quickshell:popup"
 
     onVisibleChanged: {
         if (!root.visible && Popups.active === root.popupName) {

@@ -40,7 +40,7 @@ Item {
             text: root.clock ? Qt.formatDateTime(root.clock.date, "dddd, d MMMM yyyy") : ""
             color: Theme.fgMuted
             font.family: Theme.fontFamily
-            font.pixelSize: 11
+            font.pixelSize: Theme.textSize
         }
 
         Item {
@@ -74,8 +74,7 @@ Item {
                 text: Qt.formatDate(root.viewDate, "MMMM yyyy")
                 color: Theme.fg
                 font.family: Theme.fontFamily
-                font.pixelSize: 14
-                font.weight: Font.Bold
+                font.pixelSize: Theme.textSize
             }
 
             Rectangle {
@@ -113,8 +112,7 @@ Item {
                         text: Qt.locale().dayName((root.weekStart + index) % 7, Locale.ShortFormat).substring(0, 2).toUpperCase()
                         color: Theme.fgMuted
                         font.family: Theme.fontFamily
-                        font.pixelSize: 10
-                        font.weight: Font.DemiBold
+                        font.pixelSize: Theme.textSize
                     }
                 }
             }
@@ -148,8 +146,7 @@ Item {
                         color: Theme.fg
                         opacity: dayCell.today ? 1 : 0.9
                         font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        font.weight: dayCell.today ? Font.Bold : Font.Medium
+                        font.pixelSize: Theme.textSize
                     }
                     MouseArea {
                         id: dayMa

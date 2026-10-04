@@ -45,8 +45,7 @@ RicePopup {
                 text: "Bluetooth"
                 color: Theme.fg
                 font.family: Theme.fontFamily
-                font.pixelSize: 14
-                font.weight: Font.Bold
+                font.pixelSize: Theme.textSize
             }
             Toggle {
                 Layout.alignment: Qt.AlignVCenter
@@ -61,7 +60,7 @@ RicePopup {
             text: "No Bluetooth adapter found"
             color: Theme.fgMuted
             font.family: Theme.fontFamily
-            font.pixelSize: 12
+            font.pixelSize: Theme.textSize
             horizontalAlignment: Text.AlignHCenter
         }
         Text {
@@ -70,7 +69,7 @@ RicePopup {
             text: "Bluetooth is off"
             color: Theme.fgMuted
             font.family: Theme.fontFamily
-            font.pixelSize: 12
+            font.pixelSize: Theme.textSize
             horizontalAlignment: Text.AlignHCenter
         }
         Text {
@@ -79,7 +78,7 @@ RicePopup {
             text: root.adapter && root.adapter.discovering ? "Searching for devices…" : "No devices"
             color: Theme.fgMuted
             font.family: Theme.fontFamily
-            font.pixelSize: 12
+            font.pixelSize: Theme.textSize
             horizontalAlignment: Text.AlignHCenter
         }
 
@@ -146,8 +145,7 @@ RicePopup {
                     color: Theme.fg
                     opacity: devRow.modelData.paired ? 1 : 0.65
                     font.family: Theme.fontFamily
-                    font.pixelSize: 12
-                    font.weight: devRow.modelData.connected ? Font.Bold : Font.Medium
+                    font.pixelSize: Theme.textSize
                 }
 
                 Row {
@@ -166,7 +164,7 @@ RicePopup {
                         }
                         color: Theme.fgMuted
                         font.family: Theme.fontFamily
-                        font.pixelSize: 10
+                        font.pixelSize: Theme.textSize
                     }
                     NIcon {
                         anchors.verticalCenter: parent.verticalCenter

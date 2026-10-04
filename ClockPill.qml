@@ -32,8 +32,7 @@ Pill {
         text: Qt.formatDateTime(clockObj.date, "hh:mm AP")
         color: Theme.fg
         font.family: Theme.fontFamily
-        font.pixelSize: 14
-        font.weight: Font.Bold
+        font.pixelSize: Theme.textSize
     }
 
     HoverHandler {

@@ -159,7 +159,7 @@ PanelWindow {
                             color: menuRow.modelData.enabled ? Theme.fg : Theme.fgMuted
                             opacity: menuRow.modelData.enabled ? 1 : 0.6
                             font.family: Theme.fontFamily
-                            font.pixelSize: 12
+                            font.pixelSize: Theme.textSize
                         }
 
                         NIcon {
@@ -217,7 +217,7 @@ PanelWindow {
                         text: "Back"
                         color: Theme.fgMuted
                         font.family: Theme.fontFamily
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.textSize
                     }
                 }
                 MouseArea {
