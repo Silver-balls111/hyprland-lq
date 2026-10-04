@@ -16,18 +16,74 @@ PanelWindow {
     // stack of parent handles for submenu navigation
     property var stack: []
     readonly property string popupName: "tray"
+    // selected entry index (keyboard nav; separators/disabled entries skipped)
+    property int selIndex: 0
 
     function openFor(handle, x) {
         menuHandle = handle;
         stack = [];
         anchorX = x;
         menuList.contentY = 0;
+        resetSel();
     }
 
+    function validEntry(i) {
+        const items = opener.children.values;
+        return i >= 0 && i < items.length && items[i]
+            && !items[i].isSeparator && items[i].enabled;
+    }
+
+    function step(dir) {
+        const items = opener.children.values;
+        if (items.length === 0) return;
+        let i = selIndex;
+        for (let n = 0; n < items.length; n++) {
+            i = (i + dir + items.length) % items.length;
+            if (validEntry(i)) {
+                selIndex = i;
+                return;
+            }
+        }
+    }
+
+    function resetSel() {
+        selIndex = 0;
+        if (opener.children.values.length > 0 && !validEntry(0)) step(1);
+    }
+
+    function activateSelected() {
+        const it = opener.children.values[selIndex];
+        if (!validEntry(selIndex)) return;
+        if (it.hasChildren) {
+            root.stack.push(opener.menu);
+            opener.menu = it;
+            resetSel();
+        } else {
+            it.triggered();
+            Popups.close();
+        }
+    }
+
+    onSelIndexChanged: {
+        menuList.currentIndex = selIndex;
+        if (menuList.count > 0)
+            menuList.positionViewAtIndex(selIndex, ListView.Contain);
+    }
     onVisibleChanged: {
         if (!root.visible && Popups.active === root.popupName) {
             Popups.lastDismiss = Date.now();
             Popups.active = "";
+        }
+        if (visible) {
+            resetSel();
+            body.forceActiveFocus();
+        }
+    }
+
+    Connections {
+        target: opener
+        function onChildrenChanged() {
+            if (!root.validEntry(root.selIndex)) root.resetSel();
         }
     }
 
@@ -50,8 +106,9 @@ PanelWindow {
     color: "transparent"
     visible: false
     WlrLayershell.layer: WlrLayer.Top
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
-    WlrLayershell.namespace: "quickshell:rice-traymenu"
+    // modal menu: exclusive keyboard while open (Tab/arrows/Enter/Backspace)
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+    WlrLayershell.namespace: "quickshell:traymenu"
 
     QsMenuOpener {
         id: opener
@@ -81,6 +138,33 @@ PanelWindow {
             border.width: 1
             border.color: Theme.border
             clip: true
+            focus: true
+
+            Keys.onEscapePressed: Popups.close()
+            Keys.onPressed: event => {
+                switch (event.key) {
+                case Qt.Key_Down:
+                case Qt.Key_Tab:
+                    root.step(1);
+                    break;
+                case Qt.Key_Up:
+                case Qt.Key_Backtab:
+                    root.step(-1);
+                    break;
+                case Qt.Key_Return:
+                case Qt.Key_Enter:
+                case Qt.Key_Space:
+                    root.activateSelected();
+                    break;
+                case Qt.Key_Left:
+                case Qt.Key_Backspace:
+                    if (root.stack.length > 0) {
+                        opener.menu = root.stack.pop();
+                        root.resetSel();
+                    }
+                    break;
+                }
+            }
 
             ListView {
                 id: menuList
@@ -106,6 +190,7 @@ PanelWindow {
                 delegate: Item {
                     id: menuRow
                     required property var modelData
+                    required property int index
 
                     width: menuList.width
                     height: menuRow.modelData.isSeparator ? 9 : 34
@@ -122,7 +207,8 @@ PanelWindow {
                         visible: !menuRow.modelData.isSeparator
                         anchors.fill: parent
                         radius: 10
-                        color: entryMa.containsMouse && menuRow.modelData.enabled ? Theme.rowHover : "transparent"
+                        color: (entryMa.containsMouse || menuRow.index === root.selIndex)
+                            && menuRow.modelData.enabled ? Theme.rowHover : "transparent"
                     }
 
                     Row {

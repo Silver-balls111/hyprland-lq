@@ -9,6 +9,7 @@ RicePopup {
 
     popupName: "wifi"
     panelWidth: 330
+    keyNavEnabled: true // Tab/arrows navigate networks, Enter activates, Esc closes
 
     readonly property var wifiDevice: {
         const list = Networking.devices.values;
@@ -17,13 +18,58 @@ RicePopup {
         return null;
     }
 
-    property var pending: null
+    // single source of the sorted network list (list model + keyboard nav)
+    readonly property var sortedNetworks: root.wifiDevice
+        ? [...root.wifiDevice.networks.values]
+            .sort((a, b) => (b.connected - a.connected)
+                || (b.signalStrength - a.signalStrength)
+                || a.name.localeCompare(b.name))
+        : []
 
-    onVisibleChanged: {
-        if (wifiDevice) wifiDevice.scannerEnabled = visible;
-        if (!visible) pending = null;
+    property var pending: null
+    // selected row index (keyboard nav)
+    property int selIndex: 0
+
+    // NB: Connections, not an onVisibleChanged override — a subclass handler
+    // would shadow RicePopup's own visible-changed bookkeeping
+    Connections {
+        target: root
+        function onVisibleChanged() {
+            if (root.wifiDevice) root.wifiDevice.scannerEnabled = root.visible;
+            if (!root.visible) pending = null;
+            else selIndex = 0;
+        }
     }
     onWifiDeviceChanged: if (wifiDevice) wifiDevice.scannerEnabled = visible
+    onSelIndexChanged: {
+        netList.currentIndex = selIndex;
+        if (netList.count > 0)
+            netList.positionViewAtIndex(selIndex, ListView.Contain);
+    }
+    onKeyPressed: event => {
+        switch (event.key) {
+        case Qt.Key_Down:
+        case Qt.Key_Tab:
+            if (sortedNetworks.length > 0) selIndex = (selIndex + 1) % sortedNetworks.length;
+            return;
+        case Qt.Key_Up:
+        case Qt.Key_Backtab:
+            if (sortedNetworks.length > 0) selIndex = (selIndex - 1 + sortedNetworks.length) % sortedNetworks.length;
+            return;
+        case Qt.Key_Home:
+            selIndex = 0;
+            return;
+        case Qt.Key_End:
+            selIndex = Math.max(0, sortedNetworks.length - 1);
+            return;
+        case Qt.Key_Return:
+        case Qt.Key_Enter:
+        case Qt.Key_Space:
+            if (sortedNetworks.length > 0) activate(sortedNetworks[selIndex]);
+            return;
+        }
+    }
+    onPendingChanged: if (!pending) refocusBody()
 
     function activate(net) {
         if (net.connected) {
@@ -182,17 +228,13 @@ RicePopup {
             }
 
             model: ScriptModel {
-                values: root.wifiDevice
-                    ? [...root.wifiDevice.networks.values]
-                        .sort((a, b) => (b.connected - a.connected)
-                            || (b.signalStrength - a.signalStrength)
-                            || a.name.localeCompare(b.name))
-                    : []
+                values: root.sortedNetworks
             }
 
             delegate: Item {
                 id: netRow
                 required property var modelData
+                required property int index
 
                 width: netList.width
                 height: 38
@@ -200,7 +242,8 @@ RicePopup {
                 Rectangle {
                     anchors.fill: parent
                     radius: 12
-                    color: rowMa.containsMouse ? Theme.rowHover : "transparent"
+                    color: rowMa.containsMouse || index === root.selIndex
+                        ? Theme.rowHover : "transparent"
                 }
 
                 SignalBars {

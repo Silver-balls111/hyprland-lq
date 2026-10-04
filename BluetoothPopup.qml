@@ -9,10 +9,58 @@ RicePopup {
 
     popupName: "bt"
     panelWidth: 330
+    keyNavEnabled: true // Tab/arrows navigate devices, Enter activates, Esc closes
 
     readonly property var adapter: Bluetooth.defaultAdapter
 
-    onVisibleChanged: if (adapter) adapter.discovering = visible
+    // single source of the sorted device list (list model + keyboard nav)
+    readonly property var sortedDevices: root.adapter
+        ? [...root.adapter.devices.values]
+            .sort((a, b) => (b.connected - a.connected)
+                || (b.paired - a.paired)
+                || a.name.localeCompare(b.name))
+        : []
+
+    // selected row index (keyboard nav)
+    property int selIndex: 0
+
+    // NB: Connections, not an onVisibleChanged override — a subclass handler
+    // would shadow RicePopup's own visible-changed bookkeeping
+    Connections {
+        target: root
+        function onVisibleChanged() {
+            if (root.adapter) root.adapter.discovering = root.visible;
+            if (root.visible) selIndex = 0;
+        }
+    }
+    onSelIndexChanged: {
+        devList.currentIndex = selIndex;
+        if (devList.count > 0)
+            devList.positionViewAtIndex(selIndex, ListView.Contain);
+    }
+    onKeyPressed: event => {
+        switch (event.key) {
+        case Qt.Key_Down:
+        case Qt.Key_Tab:
+            if (sortedDevices.length > 0) selIndex = (selIndex + 1) % sortedDevices.length;
+            return;
+        case Qt.Key_Up:
+        case Qt.Key_Backtab:
+            if (sortedDevices.length > 0) selIndex = (selIndex - 1 + sortedDevices.length) % sortedDevices.length;
+            return;
+        case Qt.Key_Home:
+            selIndex = 0;
+            return;
+        case Qt.Key_End:
+            selIndex = Math.max(0, sortedDevices.length - 1);
+            return;
+        case Qt.Key_Return:
+        case Qt.Key_Enter:
+        case Qt.Key_Space:
+            if (sortedDevices.length > 0) activate(sortedDevices[selIndex]);
+            return;
+        }
+    }
 
     function activate(dev) {
         if (dev.connected) {
@@ -104,17 +152,13 @@ RicePopup {
             }
 
             model: ScriptModel {
-                values: root.adapter
-                    ? [...root.adapter.devices.values]
-                        .sort((a, b) => (b.connected - a.connected)
-                            || (b.paired - a.paired)
-                            || a.name.localeCompare(b.name))
-                    : []
+                values: root.sortedDevices
             }
 
             delegate: Item {
                 id: devRow
                 required property var modelData
+                required property int index
 
                 width: devList.width
                 height: 40
@@ -122,7 +166,8 @@ RicePopup {
                 Rectangle {
                     anchors.fill: parent
                     radius: 12
-                    color: rowMa.containsMouse ? Theme.rowHover : "transparent"
+                    color: rowMa.containsMouse || index === root.selIndex
+                        ? Theme.rowHover : "transparent"
                 }
 
                 NIcon {

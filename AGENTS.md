@@ -178,6 +178,25 @@ pill as the `yItem` so every tooltip sits at one height. Toast sits at
   and it steals `org.freedesktop.Notifications` back; kill it and quickshell
   re-registers on its own.
 
+### Keyboard navigation in popups (2026-10-04)
+- `RicePopup.keyNavEnabled: true` (wifi/bt) or `grabKeys: true` (power) grabs
+  exclusive keyboard while the popup is open; the base calls
+  `body.forceActiveFocus()` on open. TrayMenuPopup is a standalone PanelWindow
+  and sets Exclusive + its own body `Keys` itself.
+- Convention per popup: a `selIndex` property + `onKeyPressed` routing —
+  `Tab`/`Down` next, `Backtab`/`Up` prev (wrapping), `Home`/`End` ends,
+  `Enter`/`Space` activates, and the lists scroll via
+  `positionViewAtIndex(selIndex, Contain)`. Tray menu selection skips
+  separators and disabled entries; `Backspace`/`Left` pops the submenu stack.
+- **QML trap: a subclass `onVisibleChanged` handler SHADOWS the base class's
+  handler** (one handler slot per signal in an inheritance chain) — the wifi/
+  bt/power popups must attach via `Connections { target: root; function
+  onVisibleChanged() {...} }` or they silently break RicePopup's
+  close-bookkeeping and focus handling.
+- `QsMenuOpener.children` is an ObjectModel — index it via `.values`, never
+  directly.
+- The dashboard popup intentionally has no keyboard nav (still OnDemand focus).
+
 ### Layer surfaces: namespaces, opacity, error banners (2026-10-04)
 - Layer namespaces: `quickshell:bar` / `quickshell:popup` / `quickshell:toast` /
   `quickshell:tooltip` (renamed away from "rice-*"; the user's

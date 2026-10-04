@@ -8,8 +8,46 @@ RicePopup {
     popupName: "power"
     panelWidth: 220
     grabKeys: true // letter keybinds (s/r/u/l/h/o) act while the popup is open
+    // selected row index (keyboard nav: Tab/arrows move, Enter/Space activates)
+    property int selIndex: 0
+    // NB: Connections, not an onVisibleChanged override — a subclass handler
+    // would shadow RicePopup's own visible-changed bookkeeping
+    Connections {
+        target: root
+        function onVisibleChanged() {
+            if (!root.visible) return;
+            selIndex = 0;
+            actionList.contentY = 0;
+        }
+    }
+    onSelIndexChanged: {
+        actionList.currentIndex = selIndex;
+        if (actionList.count > 0)
+            actionList.positionViewAtIndex(selIndex, ListView.Contain);
+    }
     // wlogout-style: the matching letter triggers the action
     onKeyPressed: event => {
+        switch (event.key) {
+        case Qt.Key_Down:
+        case Qt.Key_Tab:
+            selIndex = (selIndex + 1) % actionList.count;
+            return;
+        case Qt.Key_Up:
+        case Qt.Key_Backtab:
+            selIndex = (selIndex - 1 + actionList.count) % actionList.count;
+            return;
+        case Qt.Key_Home:
+            selIndex = 0;
+            return;
+        case Qt.Key_End:
+            selIndex = actionList.count - 1;
+            return;
+        case Qt.Key_Return:
+        case Qt.Key_Enter:
+        case Qt.Key_Space:
+            if (actionList.count > 0) root.run(actionList.model[selIndex].cmd);
+            return;
+        }
         const entry = actionList.model.find(m => m.key === event.text.toLowerCase());
         if (entry) root.run(entry.cmd);
     }
@@ -18,8 +56,6 @@ RicePopup {
         Popups.close();
         Quickshell.execDetached(cmd);
     }
-
-    onVisibleChanged: if (visible) actionList.contentY = 0
 
     ListView {
         id: actionList
@@ -57,11 +93,13 @@ RicePopup {
         delegate: Rectangle {
             id: actionRow
             required property var modelData
+            required property int index
 
             width: actionList.width
             height: 40
             radius: 12
-            color: rowMa.containsMouse ? Theme.rowHover : "transparent"
+            color: rowMa.containsMouse || index === root.selIndex
+                ? Theme.rowHover : "transparent"
 
             Row {
                 anchors.fill: parent

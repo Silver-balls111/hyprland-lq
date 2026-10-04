@@ -95,13 +95,13 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
 | Workspaces (1–5+) | Click to switch. Always shows at least 5 slots (extra empty slots create the workspace on click); more appear if you use more. The active workspace's pill widens with the accent fill; a workspace with a window requesting attention is tinted until visited. |
 | Clock pill | Stateful bell + time. The bell mirrors waybar's notification icons: quiet = plain bell, unread notifications = ringing bell (highlighted), DND = bell-sleep variants. Click opens the **dashboard**: month calendar (left) + notifications with a media player card (right). Always opens on the current month; the player card shows track info with prev/play/next when something is playing. Closes on outside click, `Esc`, or re-click. |
 | Notifications | Quickshell is the notification daemon (replaces swaync). Notifications appear as a top-right **toast banner** (2s low / 4s normal / 6s critical, app-supplied timeouts respected) and land in the dashboard's history (last 30, hover shows an ✕, click a row to remove it, `Clear` wipes it). **Do Not Disturb** silences toasts but keeps history. OSD-style notifications (`x-canonical-private-synchronous` hint, e.g. your volume/brightness scripts) replace the current toast and skip history. |
-| System tray | Real StatusNotifier tray with menus (right-click), primary action (left-click) and scroll actions. |
+| System tray | Real StatusNotifier tray with menus (right-click), primary action (left-click) and scroll actions. Tray menus are keyboard-navigable too: `Tab`/arrows move (skipping separators and greyed-out entries), `Enter` activates or drills into a submenu, `Backspace`/`Left` goes back, `Esc` closes. |
 | Volume | Scroll = ±1%, click = mute/unmute. Mirrors wpctl state. |
 | Mic | Scroll = ±2%, click = mute/unmute. |
-| Wi-Fi | Click opens a **dropdown**: toggle Wi-Fi, up to 5 networks visible with scroll, sorted by signal (connected first). Click to connect — secured networks ask for a password inline. Hover tooltip shows SSID + signal. |
-| Bluetooth | Click opens a **dropdown**: toggle adapter, up to 5 devices visible with scroll (paired first), click to pair / connect / disconnect. Icon reflects adapter state; hover tooltip lists connected devices. |
+| Wi-Fi | Click opens a **dropdown**: toggle Wi-Fi, up to 5 networks visible with scroll, sorted by signal (connected first). Click to connect — secured networks ask for a password inline. Hover tooltip shows SSID + signal. Keyboard: `Tab`/arrows move the selection, `Enter` connects/disconnects, `Esc` closes. |
+| Bluetooth | Click opens a **dropdown**: toggle adapter, up to 5 devices visible with scroll (paired first), click to pair / connect / disconnect. Icon reflects adapter state; hover tooltip lists connected devices. Keyboard: same as Wi-Fi. |
 | Battery | UPower percentage + state icon (charging/discharging sets, same glyphs as the waybar config); hover tooltip shows time remaining. |
-| Power | Click opens **Lock / Log Out / Reboot / Power Off**. |
+| Power | Click opens **Lock / Log Out / Reboot / Power Off**. Keyboard: `Tab`/arrows or the wlogout letters (`s`/`r`/`u`/`l`/`h`/`o`), `Enter` runs the action, `Esc` closes. |
 
 All icons are **Nerd Font glyphs** (JetBrains Mono Nerd Font Propo) using the
 same codepoints as `~/.config/waybar/config.jsonc` — battery levels, volume,

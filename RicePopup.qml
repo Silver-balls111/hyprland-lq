@@ -18,6 +18,9 @@ PanelWindow {
     property int panelWidth: 300
     // fixed panel height; 0 = auto-size from content (childrenRect)
     property int panelHeight: 0
+    // keyboard navigation (Tab/arrows/Enter): popups that opt in grab the
+    // keyboard while open so keys reach the panel without a click first
+    property bool keyNavEnabled: false
     // power-menu style: while open, capture ALL keys so letter keybinds work
     property bool grabKeys: false
     // forwarded from the focused body so subclasses can implement keybinds
@@ -33,7 +36,8 @@ PanelWindow {
     color: "transparent"
     visible: false
     WlrLayershell.layer: WlrLayer.Top
-    WlrLayershell.keyboardFocus: root.grabKeys ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand
+    WlrLayershell.keyboardFocus: root.grabKeys || root.keyNavEnabled
+        ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand
     WlrLayershell.namespace: "quickshell:popup"
 
     onVisibleChanged: {
@@ -41,6 +45,13 @@ PanelWindow {
             Popups.lastDismiss = Date.now();
             Popups.active = "";
         }
+        if (visible) body.forceActiveFocus();
+    }
+
+    // hand keyboard focus back to the panel body (e.g. after a TextField
+    // inside a subclass gave it away)
+    function refocusBody() {
+        body.forceActiveFocus();
     }
 
     Connections {
