@@ -37,7 +37,7 @@ the config on every file save — you do not need to restart to test QML edits).
 | `NotifsPanel.qml` | Right column of the dashboard: MPRIS player card(s) docked on top (`Mpris.players` filtered to non-stopped), notification history ListView (rows show a hover ✕ — visual only, the row MouseArea handles the click and removes the entry), bell "No Notifications" empty state, footer with DND `Toggle` + `Clear`. |
 | `Notifs.qml` (singleton) | Notification history (plain JS snapshots, capped 30, newest first), `dnd`, current `toast` entry, `push/remove/clearAll/closeToast`. `push` sets `n.tracked = true` — see notification gotcha. |
 | `Toast.qml` | Top-right toast banner (small mapped-only window, TooltipWindow pattern). Timer mirrors the user's old swaync timings: 2s low / 4s normal / 6s critical; app-supplied `expireTimeout` (ms) wins when > 0, clamped 2–15s. Hidden while DND or the dashboard is open. Click = dismiss. |
-| `Wallswitch.qml` | Slanted wallpaper picker (skwd-wall "Slices" look, right-leaning) floating over the live desktop — NO dim backdrop, invisible input shield. 11→9-slot recycled carousel, preview-first UX; applies via the `awww` + `matugen` binaries directly — the rofi `wall-switcher.sh` is retired (see its section below). |
+| `Wallswitch.qml` | Slanted wallpaper picker (skwd-wall "Slices" look, right-leaning) floating over the live desktop — NO dim backdrop, invisible input shield. 9-slot recycled carousel (4 strips per side), type-to-search, preview-first UX; applies via the `awww` + `matugen` binaries directly — the rofi `wall-switcher.sh` is retired (see its section below). |
 | `shaders/` | Prebuilt `.qsb` shaders for Wallswitch's slot rendering (AA'd parallelogram mask). Sources kept alongside; recompile command in the wallpaper section. |
 | `TrayMenuPopup.qml` | Themed DBusMenu renderer for tray items (`QsMenuOpener`), one submenu drill-down level with a Back row. Scroll position resets on every open. |
 | `TooltipWindow.qml` | Small floating window rendering ONE hover tooltip; positioned via layer-shell margins. Only mapped while showing. |
@@ -390,33 +390,67 @@ directly).
   `apply()` makes a double delivery a no-op, and any unrecognized extended
   key (>= 0x01000000) `console.warn`s its code. The `dimaround` layer rule
   on `quickshell:wallswitch` is also user-confirmed.
-- **Jagged slanted edges: they live in a fragment shader now** — and there
-  was NO simpler fix, don't re-litigate: a transformed quad's edges are
-  rasterized WITHOUT anti-aliasing; `clip: true` is binary scissor/stencil;
+- **Search (type-to-filter, implemented 2026-10-04):** printable keys append
+  to `query` (Space still applies — only `event.text >= "!"` with no
+  Ctrl/Alt/Meta counts as typing), Backspace pops, Esc clears the query
+  first and closes only when it's empty. `onQueryChanged: rebuildShown()` is
+  THE filter hook — without that one line, typing does nothing (it shipped
+  missing once; the seed-before-load test passed because the list-load
+  rebuild ran after the seed — always test the typing path with the query
+  set AFTER the list is loaded). The carousel runs on `shown` — a
+  filtered list of indices into `walls` (case-insensitive basename
+  substring); `selected` stays a walls-index (apply/currentPath logic
+  untouched) while `selectedPos` = its position within `shown` drives
+  `centerPos`. Filter changes SNAP (`animateNav = false`), never slide.
+  A chip above the row shows `query · N matches` only while a query is
+  active; a distinct "No matches" chip covers the empty filtered set. With
+  fewer matches than slots the same wallpapers repeat around the wrap —
+  inherent, not a bug. Gotcha hit live: Quickshell flips `visible`
+  ASYNCHRONOUSLY on the real map — a `query = ""` reset in
+  `onVisibleChanged(visible=true)` ran AFTER the test seeded the query and
+  clobbered it; the reset therefore lives on the CLOSE branch
+  (`else if (query !== "") query = ""`).
+- **Kitty stderr noise on apply, solved:** matugen's config had a stale
+  `[templates.kitty]` block whose `post_hook = 'kill -SIGUSR1 $(pgrep
+  kitty)'` ran on EVERY palette regen; with no kitty running `pgrep` returns
+  nothing and `kill` prints its usage error, which matugen reports on stderr
+  and the picker's apply-Process logs as "wallswitch: apply stderr". The
+  block is commented out in `~/.config/matugen/config.toml` — if that
+  warning ever returns, check for resurrected template blocks there. The
+  picker deliberately logs matugen stderr (it surfaces real failures); don't
+  silence it.
+- **Jagged slanted edges — PARKED shader experiment, NOT in the live code.**
+  Status: the user reverted the switcher to the `shearWrap` + `Matrix4x4` +
+  `clip` version (edges aliased, accepted for now); `shaders/` is kept
+  committed so a future session doesn't start from scratch. The conclusion
+  stands: there is NO simple fix — a transformed quad's edges are rasterized
+  WITHOUT anti-aliasing; `clip: true` is binary scissor/stencil;
   `layer.enabled/smooth/samples` only change texture *sampling* (the quad
-  boundary stays hard — this was tried and did NOT fix it, don't claim it
-  does again); Quickshell 0.3.1 exposes no window-MSAA property (checked the
-  qmltypes). So each slot is a `ShaderEffect` with prebuilt `.qsb` shaders
-  (`shaders/wallslot.{vert,frag}.qsb`, editable sources kept beside them)
-  that masks the parallelogram with a 1px `smoothstep` and draws image +
-  dim + accent border analytically. qsb workflow gotchas (all hit live):
-  - Qt 6 ShaderEffect takes ONLY `.qsb` URLs — runtime GLSL strings are
-    treated as file paths and fail. Recompile after editing:
-    `/usr/lib/qt6/bin/qsb --glsl "100es,440" --hlsl 50 --msl 12 -o X.qsb X`
-    (`--glsl 100es` alone is NOT enough — the desktop-GL backend tries
-    versions 120..460 and errors "No GLSL shader code found").
-  - The vertex shader must declare `qt_TexCoord0` (location 1) even when
-    unused — Qt's quad mesh provides it and the material validates inputs.
-  - The uniform block is `qt_Matrix`, `qt_Opacity`, then the QML custom
-    properties in ALPHABETICAL order (std140, binding 0); the sampler is
-    `layout(binding = 1)`.
-  - Empirical AA check that settles "still jagged?" without eyeballing:
-    dump one pixel row crossing the border (`magick ... txt:`) —
-    anti-aliased edges show intermediate blended values, aliased ones jump
-    straight from border color to background.
-  - Test-instance trap: a throwaway never runs shell.qml, so Theme keeps
-    DEFAULTS — the border reads default pink #f7c2d1 in test screenshots
-    and the matugen accent in the live bar. Don't scan for the wrong color.
+  boundary stays hard — tried, did NOT fix it, don't claim otherwise);
+  Quickshell 0.3.1 exposes no window-MSAA property (checked the qmltypes).
+  The working-but-reverted approach: each slot = `ShaderEffect` with
+  prebuilt `.qsb` shaders masking the parallelogram with a 1px `smoothstep`
+  (AA verified numerically: pixel rows across the border show blended
+  intermediate values). What killed it — TWO bugs shipped together in the
+  rewrite and my verification only checked the border zoom, not the frame:
+  1. **Mask clipped to a rectangle** (user's exact diagnosis): fragments
+     outside a ShaderEffect's own rect never rasterize, and the parallelogram
+     extends `k*slotH/2` px beyond it — the overhang must be added back by
+     widening the effect item (negative left/right anchor margins) and
+     masking at `x - pad + shear*(y - H/2)` with `pad = shearK*slotH/2`.
+  2. **Lean flipped**: the old matrix's `m12 = -k` corresponds to a mask
+     left edge of `pad - shear*(y - H/2)` (tops lean RIGHT); using
+     `+shear*(y - H/2)` mirrors it.
+  If resumed, start from `shaders/wallslot.{vert,frag}` (sources carry
+  comments), recompile with
+  `/usr/lib/qt6/bin/qsb --glsl "100es,440" --hlsl 50 --msl 12 -o X.qsb X`,
+  and re-apply the geometry fix above BEFORE screenshotting. qsb gotchas
+  (all hit live): Qt 6 ShaderEffect takes ONLY `.qsb` URLs — runtime GLSL
+  strings are treated as file paths; `--glsl 100es` alone is NOT enough
+  (desktop-GL tries versions 120..460 → "No GLSL shader code found"); the
+  vertex shader must declare `qt_TexCoord0` (location 1) even when unused;
+  uniform block = `qt_Matrix`, `qt_Opacity`, then QML custom properties in
+  ALPHABETICAL order (std140, binding 0), sampler `layout(binding = 1)`.
 - **Parallelogram slices: shear a clipped WINDOW, never the Image.** The
   sheared Image is ~`k*slotH` px wider than its strip; with no clip (or a
   plain `clip: true` on the slot) that content spills over the neighboring
@@ -437,8 +471,11 @@ directly).
   tree (plus a `property alias imgItem: img` for statuses) found it in one
   run. `console.log` doesn't surface, `console.warn` does.
 
-**TODO (user-requested follow-up): a search/filter for the 472 wallpapers**
-(type-to-narrow or a query field). Not implemented yet.
+  run. `console.log` doesn't surface, `console.warn` does.
+- **Test-instance trap**: a throwaway never runs shell.qml, so Theme keeps
+  DEFAULTS — the accent border reads default pink #f7c2d1 in test
+  screenshots and the matugen accent in the live bar. Don't scan for the
+  wrong color when pixel-checking.
 
 ## Extra notes / user preferences
 

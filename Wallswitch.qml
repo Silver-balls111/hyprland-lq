@@ -5,6 +5,8 @@
 // angle (one uniform lean across the whole row, accent border around it).
 // Preview-first: click a strip / scroll / arrow keys to move the
 // selection, then click the centered one or press Enter/Space to apply.
+// Type to search: printable keys filter the set live (chip appears above the
+// row with the query + match count), Backspace edits, Esc clears first.
 //
 // Apply shells out to the binaries directly (no wall-switcher.sh):
 //   awww img <path> --transition-type <random of 5> --transition-duration 1.2 --transition-fps 60
@@ -37,6 +39,11 @@ PanelWindow {
     property bool animateNav: true      // false = next centerPos update snaps
     property bool everOpened: false     // first open snaps, later ones slide
     property real lastApply: 0          // guards double-delivered Enter events
+    // type-to-search: printable keys append to `query`, Backspace pops, Esc
+    // clears it first (second Esc closes). Invisible until something is typed.
+    property string query: ""
+    property var shown: []              // indices into `walls` matching `query`
+    property int selectedPos: 0         // `selected`'s position within `shown`
 
     readonly property string wallDir: Quickshell.env("HOME") + "/Pictures/wallpapers/images"
     // same five the old rofi switcher picked from
@@ -78,9 +85,14 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell:wallswitch"
 
     onVisibleChanged: {
+        // NB: Quickshell flips `visible` asynchronously on the actual map —
+        // anything set right after Popups.active changes lands BEFORE this
+        // runs, so the filter is reset on CLOSE, not on open.
         if (root.visible) {
             refresh();
             keySink.forceActiveFocus();
+        } else if (query !== "") {
+            query = "";             // fresh filter on every open
         }
     }
 
@@ -144,8 +156,7 @@ PanelWindow {
         everOpened = true;
         if (!walls.length) {
             selected = -1;
-            centerPos = 0;
-            layoutSlots();
+            rebuildShown();
             return;
         }
         let idx = currentPath ? walls.indexOf(currentPath) : -1;
@@ -153,11 +164,15 @@ PanelWindow {
         animateNav = false;
         selected = idx;
         animateNav = true;
-        layoutSlots();
+        rebuildShown();
     }
 
     // ---- navigation ----
-    onSelectedChanged: centerPos = selected
+    onSelectedPosChanged: centerPos = selectedPos
+    // THE actual filter hook — every keystroke rebuilds `shown`. (Without
+    // this the query is just a string: the rebuild only ran on list-load,
+    // which a seed-before-load test masks.)
+    onQueryChanged: rebuildShown()
 
     Behavior on centerPos {
         enabled: root.animateNav && root.everOpened
@@ -171,9 +186,34 @@ PanelWindow {
         return ((a % n) + n) % n;
     }
 
-    // shortest wrap-around distance from pos to idx
+    // indices into `walls` whose basename contains `query` (case-insensitive)
+    function rebuildShown() {
+        const q = query.toLowerCase();
+        const list = [];
+        for (let i = 0; i < walls.length; i++) {
+            if (!q || basename(walls[i]).toLowerCase().includes(q)) list.push(i);
+        }
+        shown = list;
+        // the set changed under us — snap, never fly across it
+        animateNav = false;
+        selectedPos = shown.indexOf(selected) !== -1 ? shown.indexOf(selected) : 0;
+        centerPos = selectedPos;
+        animateNav = true;
+        layoutSlots();
+    }
+
+    // wallpaper path at position `pos` within `shown`
+    function wallAt(pos) {
+        return pos >= 0 && pos < shown.length ? walls[shown[pos]] : "";
+    }
+
+    function wallSource(pos) {
+        return pos >= 0 && pos < shown.length ? "file://" + walls[shown[pos]] : "";
+    }
+
+    // shortest wrap-around distance from pos to idx (within `shown`)
     function signedDist(idx, pos) {
-        const n = walls.length;
+        const n = shown.length;
         if (!n) return 99;
         let d = (idx - pos) % n;
         if (d > n / 2) d -= n;
@@ -182,23 +222,26 @@ PanelWindow {
     }
 
     function step(dir) {
-        if (!walls.length) return;
+        if (!shown.length) return;
         animateNav = true;
-        selected = mod(selected + dir, walls.length);
+        selectedPos = mod(selectedPos + dir, shown.length);
+        selected = shown[selectedPos];
     }
 
     // click a side strip: bring that wallpaper to the center
-    function select(idx) {
-        if (idx < 0 || idx >= walls.length) return;
+    function select(pos) {
+        if (pos < 0 || pos >= shown.length) return;
         animateNav = true;
-        selected = idx;
+        selectedPos = pos;
+        selected = shown[pos];
     }
 
-    // jump without the 260ms flythrough (Home/End, big index distance)
-    function jump(idx) {
-        if (!walls.length) return;
+    // jump without the 260ms flythrough (Home/End, big position distance)
+    function jump(pos) {
+        if (!shown.length) return;
         animateNav = false;
-        selected = mod(idx, walls.length);
+        selectedPos = mod(pos, shown.length);
+        selected = shown[selectedPos];
         animateNav = true;
     }
 
@@ -208,13 +251,13 @@ PanelWindow {
 
     // ---- apply ----
     function apply() {
-        if (selected < 0 || selected >= walls.length) return;
+        if (selectedPos < 0 || selectedPos >= shown.length) return;
         // Return/Enter can be delivered to BOTH the generic and the specific
         // Keys handlers — the guard makes a double delivery a no-op
         const now = Date.now();
         if (now - lastApply < 250) return;
         lastApply = now;
-        applyProc.path = walls[selected];
+        applyProc.path = walls[shown[selectedPos]];
         applyProc.trans = transitions[Math.floor(Math.random() * transitions.length)];
         applyProc.running = true;
         Popups.close();
@@ -243,10 +286,11 @@ PanelWindow {
     }
 
     // ---- slot recycling ----
-    // Each slot holds a stable wallIdx; layoutSlots() keeps the 11 indices
-    // around floor(centerPos) assigned, moving only slots whose opacity is ~0.
+    // Each slot holds a stable position within `shown`; layoutSlots() keeps
+    // the 9 indices around floor(centerPos) assigned, moving only slots whose
+    // opacity is ~0.
     function layoutSlots() {
-        const n = walls.length;
+        const n = shown.length;
         if (!n) return;
         const count = Math.min(maxSlots, n);
         const half = Math.floor(maxSlots / 2);
@@ -305,6 +349,68 @@ PanelWindow {
             onWheel: ev => {
                 const delta = ev.angleDelta.y !== 0 ? ev.angleDelta.y : ev.angleDelta.x;
                 if (delta !== 0) root.step(delta > 0 ? -1 : 1);
+            }
+        }
+
+        // type-to-search chip — invisible until something is typed; sits
+        // above the row, styled like the filename chips
+        Rectangle {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: (root.scrH - root.slotH) / 2 - 44
+            visible: root.query !== ""
+            width: searchRow.implicitWidth + 24
+            height: 30
+            radius: 6
+            color: Qt.rgba(0, 0, 0, 0.55)
+            border.width: 1
+            border.color: Qt.rgba(1, 1, 1, 0.35)
+
+            Row {
+                id: searchRow
+                anchors.centerIn: parent
+                spacing: 8
+
+                Text {
+                    text: root.query
+                    color: Qt.rgba(1, 1, 1, 0.95)
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.textSize
+                }
+                // caret
+                Rectangle {
+                    width: 2
+                    height: 16
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: Theme.accent
+                }
+                Text {
+                    text: root.shown.length + (root.shown.length === 1 ? " match" : " matches")
+                    visible: root.query !== ""
+                    color: Qt.rgba(1, 1, 1, 0.6)
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.textSize
+                }
+            }
+        }
+
+        // no-match state (distinct from an empty wallpaper dir)
+        Rectangle {
+            anchors.centerIn: parent
+            visible: root.query !== "" && root.listReady && !root.shown.length
+            width: noMatchText.implicitWidth + 20
+            height: 34
+            radius: 6
+            color: Qt.rgba(0, 0, 0, 0.55)
+            border.width: 1
+            border.color: Qt.rgba(1, 1, 1, 0.35)
+
+            Text {
+                id: noMatchText
+                anchors.centerIn: parent
+                text: "No matches for \"" + root.query + "\""
+                color: Qt.rgba(1, 1, 1, 0.92)
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.textSize
             }
         }
 
@@ -397,7 +503,7 @@ PanelWindow {
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         cache: true
-                        source: slot.wallIdx >= 0 && root.walls.length ? "file://" + root.walls[slot.wallIdx] : ""
+                        source: root.wallSource(slot.wallIdx)
                         // decode cap: quantized so the continuous width morph
                         // doesn't re-decode every frame
                         sourceSize.width: Math.max(64, Math.ceil(width / 128) * 128)
@@ -442,14 +548,14 @@ PanelWindow {
                 border.color: Qt.rgba(1, 1, 1, 0.35)
                 // filename chip only on the focused wallpaper (pure visibility
                 // toggle — no image reloads involved)
-                visible: slot.wallIdx === root.selected
+                visible: slot.wallIdx === root.selectedPos
 
                 Text {
                     id: chipText
                     anchors.centerIn: parent
                     width: Math.min(implicitWidth, chip.width - 10)
                     elide: Text.ElideRight
-                    text: slot.wallIdx >= 0 ? root.basename(root.walls[slot.wallIdx]) : ""
+                    text: slot.wallIdx >= 0 ? root.basename(root.wallAt(slot.wallIdx)) : ""
                     color: Qt.rgba(1, 1, 1, 0.92)
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.textSize
@@ -474,7 +580,12 @@ PanelWindow {
         Keys.onPressed: event => {
             const k = event.key;
             if (k === Qt.Key_Escape) {
-                Popups.close();
+                // first Esc clears an active search, second closes
+                if (root.query !== "") root.query = "";
+                else Popups.close();
+                event.accepted = true;
+            } else if (k === Qt.Key_Backspace) {
+                if (root.query !== "") root.query = root.query.slice(0, -1);
                 event.accepted = true;
             } else if (k === Qt.Key_Left || k === Qt.Key_Up || k === Qt.Key_Backtab) {
                 root.step(-1);
@@ -486,11 +597,16 @@ PanelWindow {
                 root.jump(0);
                 event.accepted = true;
             } else if (k === Qt.Key_End) {
-                root.jump(root.walls.length - 1);
+                root.jump(root.shown.length - 1);
                 event.accepted = true;
             } else if (k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_Space
                     || event.text === "\r" || event.text === "\n") {
                 root.apply();
+                event.accepted = true;
+            } else if (event.text.length === 1 && event.text >= "!"
+                    && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) {
+                // printable character — type to search (Space still applies)
+                root.query += event.text;
                 event.accepted = true;
             } else if (k >= 0x01000000) {
                 // unrecognized extended key — surface it (console.log is lost,
