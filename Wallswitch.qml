@@ -1,0 +1,496 @@
+// Wallpaper picker — the skwd-wall "Slices" look, minus the feature buffet:
+// a horizontal carousel of right-leaning sheared strips floating over the
+// live desktop (NO dim backdrop — the window behind stays fully visible),
+// with the selected wallpaper enlarged in the center at the SAME shear
+// angle (one uniform lean across the whole row, accent border around it).
+// Preview-first: click a strip / scroll / arrow keys to move the
+// selection, then click the centered one or press Enter/Space to apply.
+//
+// Apply shells out to the binaries directly (no wall-switcher.sh):
+//   awww img <path> --transition-type <random of 5> --transition-duration 1.2 --transition-fps 60
+//   matugen image <path> --prefer darkness --config ~/.config/matugen/config.toml
+// matugen's config has set = false, so it only regenerates the palette — the
+// bar recolors live via the colors.css FileView in shell.qml.
+//
+// Carousel: 11 recycled slots around a real-valued `centerPos` (animated
+// toward `selected`). Slot geometry is a pure function of the signed distance
+// d = wallIdx - centerPos, so positions/widths/shear morph continuously; the
+// slot at the far edge teleports to the other side while its opacity is ~0.
+import QtQuick
+import Quickshell
+import Quickshell.Io
+import Quickshell.Wayland
+
+PanelWindow {
+    id: root
+
+    // ---- Popups wiring (same pattern as RicePopup) ----
+    property string popupName: "wall"
+
+    // ---- picker state ----
+    property var walls: []              // absolute paths, sorted
+    property int selected: -1           // index into walls, -1 = unresolved
+    property real centerPos: 0          // animated toward `selected`
+    property bool listReady: false
+    property bool queryReady: false
+    property string currentPath: ""     // from `awww query`
+    property bool animateNav: true      // false = next centerPos update snaps
+    property bool everOpened: false     // first open snaps, later ones slide
+    property real lastApply: 0          // guards double-delivered Enter events
+
+    readonly property string wallDir: Quickshell.env("HOME") + "/Pictures/wallpapers/images"
+    // same five the old rofi switcher picked from
+    readonly property var transitions: ["fade", "wipe", "outer", "grow", "slide"]
+
+    // ---- geometry (fractions of the screen, tuned on eDP-1 1920x1080 to
+    // match the skwd reference: smaller center, strips reaching the edges) ----
+    // NB: QML property names cannot start with an uppercase letter
+    readonly property real scrW: screen ? screen.width : 1920
+    readonly property real scrH: screen ? screen.height : 1080
+    readonly property real slotH: Math.round(scrH * 0.48)
+    readonly property real stripW: Math.round(slotH * 0.20)
+    readonly property real gap: Math.round(scrH * 0.014)
+    // FIXED center frame — every wallpaper sits in the same box when centered
+    // (non-16:9 ones center-crop, like skwd's fixed frame)
+    readonly property real centerW: Math.round(slotH * 16 / 9)
+    readonly property real shearK: 0.35   // |tan| of the lean (~19°)
+    readonly property int maxSlots: 11
+
+    anchors {
+        top: true
+        bottom: true
+        left: true
+        right: true
+    }
+    exclusiveZone: -1
+    color: "transparent"
+    visible: false
+    // Exclusive while mapped — the picker owns the keyboard so arrows/Enter/
+    // Esc work anywhere. Unmapped windows hold no focus.
+    WlrLayershell.layer: WlrLayer.Top
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+    WlrLayershell.namespace: "quickshell:wallswitch"
+
+    onVisibleChanged: {
+        if (root.visible) {
+            refresh();
+            keySink.forceActiveFocus();
+        }
+    }
+
+    Connections {
+        target: Popups
+        function onActiveChanged() {
+            root.visible = (Popups.active === root.popupName);
+        }
+    }
+
+    Component.onCompleted: {
+        visible = (Popups.active === popupName);
+        layoutSlots();
+    }
+
+    // ---- data loading (re-run on every open; both are cheap) ----
+    function refresh() {
+        listReady = false;
+        queryReady = false;
+        listProc.running = true;
+        queryProc.running = true;
+    }
+
+    Process {
+        id: listProc
+        // argv, not string interpolation — filenames can contain anything
+        command: ["sh", "-c",
+            "find \"$1\" -maxdepth 1 -type f \\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.gif' -o -iname '*.bmp' \\) -print | sort",
+            "sh", root.wallDir]
+        stdout: StdioCollector {
+            onStreamFinished: root.setList(text)
+        }
+    }
+
+    // same parse hyprlock-auto.sh uses: `(?<=image: ).*`
+    Process {
+        id: queryProc
+        command: ["sh", "-c", "awww query 2>/dev/null | grep -oP '(?<=image: ).*' | head -n 1"]
+        stdout: StdioCollector {
+            onStreamFinished: root.setCurrent(text)
+        }
+    }
+
+    function setList(stdoutText) {
+        walls = stdoutText.split("\n").map(s => s.trim()).filter(s => s !== "");
+        listReady = true;
+        resolveSelection();
+    }
+
+    function setCurrent(stdoutText) {
+        const p = stdoutText.trim();
+        if (p) currentPath = p;
+        queryReady = true;
+        resolveSelection();
+    }
+
+    // Runs when either load completes; selection resolves once the list is in
+    // (the query may land before or after it).
+    function resolveSelection() {
+        if (!listReady) return;
+        everOpened = true;
+        if (!walls.length) {
+            selected = -1;
+            centerPos = 0;
+            layoutSlots();
+            return;
+        }
+        let idx = currentPath ? walls.indexOf(currentPath) : -1;
+        if (idx === -1) idx = (selected >= 0 && selected < walls.length) ? selected : 0;
+        animateNav = false;
+        selected = idx;
+        animateNav = true;
+        layoutSlots();
+    }
+
+    // ---- navigation ----
+    onSelectedChanged: centerPos = selected
+
+    Behavior on centerPos {
+        enabled: root.animateNav && root.everOpened
+        NumberAnimation {
+            duration: 260
+            easing.type: Easing.OutCubic
+        }
+    }
+
+    function mod(a, n) {
+        return ((a % n) + n) % n;
+    }
+
+    // shortest wrap-around distance from pos to idx
+    function signedDist(idx, pos) {
+        const n = walls.length;
+        if (!n) return 99;
+        let d = (idx - pos) % n;
+        if (d > n / 2) d -= n;
+        if (d < -n / 2) d += n;
+        return d;
+    }
+
+    function step(dir) {
+        if (!walls.length) return;
+        animateNav = true;
+        selected = mod(selected + dir, walls.length);
+    }
+
+    // click a side strip: bring that wallpaper to the center
+    function select(idx) {
+        if (idx < 0 || idx >= walls.length) return;
+        animateNav = true;
+        selected = idx;
+    }
+
+    // jump without the 260ms flythrough (Home/End, big index distance)
+    function jump(idx) {
+        if (!walls.length) return;
+        animateNav = false;
+        selected = mod(idx, walls.length);
+        animateNav = true;
+    }
+
+    function basename(p) {
+        return p.slice(p.lastIndexOf("/") + 1);
+    }
+
+    // ---- apply ----
+    function apply() {
+        if (selected < 0 || selected >= walls.length) return;
+        // Return/Enter can be delivered to BOTH the generic and the specific
+        // Keys handlers — the guard makes a double delivery a no-op
+        const now = Date.now();
+        if (now - lastApply < 250) return;
+        lastApply = now;
+        applyProc.path = walls[selected];
+        applyProc.trans = transitions[Math.floor(Math.random() * transitions.length)];
+        applyProc.running = true;
+        Popups.close();
+    }
+
+    Process {
+        id: applyProc
+        property string path: ""
+        property string trans: "fade"
+        // path/trans arrive as positional args — no quoting hazards
+        command: ["sh", "-c",
+            'awww img "$1" --transition-type "$2" --transition-duration 1.2 --transition-fps 60' +
+            ' && matugen image "$1" --prefer darkness --config "$HOME/.config/matugen/config.toml"',
+            "sh", path, trans]
+        stdout: StdioCollector {}
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (text.trim()) console.warn("wallswitch: apply stderr:", text.trim());
+            }
+        }
+        onExited: (code, status) => {
+            // awww failure short-circuits matugen, so the palette can never
+            // desync from the wallpaper
+            if (code !== 0) console.warn("wallswitch: apply failed, exit code", code);
+        }
+    }
+
+    // ---- slot recycling ----
+    // Each slot holds a stable wallIdx; layoutSlots() keeps the 11 indices
+    // around floor(centerPos) assigned, moving only slots whose opacity is ~0.
+    function layoutSlots() {
+        const n = walls.length;
+        if (!n) return;
+        const count = Math.min(maxSlots, n);
+        const half = Math.floor(maxSlots / 2);
+        const need = [];
+        for (let o = -half; o <= half && need.length < count; o++) {
+            const idx = mod(Math.floor(centerPos) + o, n);
+            if (need.indexOf(idx) === -1) need.push(idx);
+        }
+        for (let i = 0; i < maxSlots; i++) {
+            const s = slotRepeater.itemAt(i);
+            if (!s) continue;
+            if (i >= count) { s.wallIdx = -1; continue; }
+            if (need.indexOf(s.wallIdx) !== -1) continue;
+            // this slot's index drifted out of the window — give it the
+            // needed index farthest from its current position
+            let farthest = -1, bestDist = -1;
+            for (const idx of need) {
+                if (slotAssigned(idx)) continue;
+                const dist = Math.abs(signedDist(idx, centerPos) - signedDist(s.wallIdx, centerPos));
+                if (dist > bestDist) {
+                    bestDist = dist;
+                    farthest = idx;
+                }
+            }
+            if (farthest !== -1) s.wallIdx = farthest;
+        }
+    }
+
+    function slotAssigned(idx) {
+        for (let i = 0; i < maxSlots; i++) {
+            const s = slotRepeater.itemAt(i);
+            if (s && s.wallIdx === idx) return true;
+        }
+        return false;
+    }
+
+    onCenterPosChanged: layoutSlots()
+
+    // ---- visuals ----
+    // INVISIBLE full-screen shield — the carousel floats over the live
+    // desktop (skwd-style, no dim). Clicking bare desktop closes it; the
+    // wheel browses from anywhere.
+    Item {
+        anchors.fill: parent
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: {
+                Popups.lastDismiss = Date.now();
+                Popups.close();
+            }
+        }
+
+        WheelHandler {
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            onWheel: ev => {
+                const delta = ev.angleDelta.y !== 0 ? ev.angleDelta.y : ev.angleDelta.x;
+                if (delta !== 0) root.step(delta > 0 ? -1 : 1);
+            }
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            visible: root.listReady && !root.walls.length
+            width: emptyText.implicitWidth + 20
+            height: 34
+            radius: 6
+            color: Qt.rgba(0, 0, 0, 0.55)
+            border.width: 1
+            border.color: Qt.rgba(1, 1, 1, 0.35)
+
+            Text {
+                id: emptyText
+                anchors.centerIn: parent
+                text: "No wallpapers in " + root.wallDir
+                color: Qt.rgba(1, 1, 1, 0.92)
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.textSize
+            }
+        }
+    }
+
+    Repeater {
+        id: slotRepeater
+        model: root.maxSlots
+
+        delegate: Item {
+            id: slot
+
+            property int wallIdx: -1
+            readonly property real d: root.signedDist(wallIdx, root.centerPos)
+            readonly property real ad: Math.abs(d)
+            readonly property real t: Math.min(ad, 1)          // 0 = center, 1 = full strip
+            readonly property bool isCenter: ad < 0.5
+            readonly property bool hovered: stripArea.containsMouse
+            // uniform shear across ALL slots — the center leans exactly like
+            // the strips (skwd's whole plane shares one angle)
+            readonly property real shearAmt: root.shearK
+
+            visible: wallIdx >= 0 && ad < 5.6
+            opacity: Math.max(0, Math.min(1, 5.5 - ad))
+            z: Math.round(100 - ad * 10)
+
+            width: root.centerW + (root.stripW - root.centerW) * t
+            height: root.slotH
+            x: root.scrW / 2 + (d > 0.001 ? 1 : d < -0.001 ? -1 : 0) * slotOffset(ad) - width / 2
+            y: (root.scrH - height) / 2
+
+            // center-to-strip-edge distance for a slot at |d| = tt; the first
+            // strip hugs the center image's edge (like the reference), later
+            // ones step by stripW + gap
+            function slotOffset(tt) {
+                const full = root.centerW / 2 + root.gap + root.stripW / 2;
+                if (tt <= 1) return tt * full;
+                return full + (tt - 1) * (root.stripW + root.gap);
+            }
+
+            // center-vs-strip morph target; the center frame is FIXED 16:9
+            // (centerW), so no aspect feedback loop is needed
+
+            // sheared window: the clip rect lives INSIDE the transform, so the
+            // strip is a clean parallelogram slice (clipping a sheared image
+            // directly would spill unsheared content over the neighbors)
+            Item {
+                id: shearWrap
+                anchors.fill: parent
+                transform: Matrix4x4 {
+                    // x' = x - k*y + k*H/2 (shear about the vertical middle);
+                    // m12 = -k puts the TOP edge to the right = right-leaning.
+                    // Applied to the center slot too — one uniform angle.
+                    matrix: Qt.matrix4x4(
+                        1, -slot.shearAmt, 0, slot.shearAmt * slot.height / 2,
+                        0, 1, 0, 0,
+                        0, 0, 1, 0,
+                        0, 0, 0, 1)
+                }
+
+                Item {
+                    id: window
+                    anchors.fill: parent
+                    clip: true
+
+                    Image {
+                        id: img
+                        anchors.fill: parent
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        cache: true
+                        source: slot.wallIdx >= 0 && root.walls.length ? "file://" + root.walls[slot.wallIdx] : ""
+                        // decode cap: quantized so the continuous width morph
+                        // doesn't re-decode every frame
+                        sourceSize.width: Math.max(64, Math.ceil(width / 128) * 128)
+                        sourceSize.height: 0
+                    }
+
+                    // dim overlay (center is undimmed); hover brightens
+                    Rectangle {
+                        anchors.fill: parent
+                        color: "black"
+                        opacity: slot.hovered ? 0.5 * slot.t * 0.3 : 0.5 * slot.t
+                        visible: opacity > 0.01
+
+                        Behavior on opacity {
+                            NumberAnimation { duration: 120 }
+                        }
+                    }
+
+                    // accent border, solid only at the center slot (like the
+                    // reference's highlighted selection)
+                    Rectangle {
+                        anchors.fill: parent
+                        color: "transparent"
+                        border.width: 2
+                        border.color: Theme.accent
+                        opacity: 1 - slot.t
+                        visible: opacity > 0.02
+                    }
+                }
+            }
+
+            // filename chip, bottom-left of every slot (the reference's "PIC")
+            Rectangle {
+                id: chip
+                x: 6
+                y: parent.height - 27
+                width: Math.min(chipText.implicitWidth + 14, parent.width - 12)
+                height: 21
+                radius: 3
+                color: Qt.rgba(0, 0, 0, 0.55)
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, 0.35)
+                visible: slot.ad < 4.6
+
+                Text {
+                    id: chipText
+                    anchors.centerIn: parent
+                    width: Math.min(implicitWidth, chip.width - 10)
+                    elide: Text.ElideRight
+                    text: slot.wallIdx >= 0 ? root.basename(root.walls[slot.wallIdx]) : ""
+                    color: Qt.rgba(1, 1, 1, 0.92)
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.textSize
+                }
+            }
+
+            MouseArea {
+                id: stripArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: slot.isCenter ? root.apply() : root.select(slot.wallIdx)
+            }
+        }
+    }
+
+    // keyboard focus sink while the picker is open
+    Item {
+        id: keySink
+        focus: true
+
+        Keys.onPressed: event => {
+            const k = event.key;
+            if (k === Qt.Key_Escape) {
+                Popups.close();
+                event.accepted = true;
+            } else if (k === Qt.Key_Left || k === Qt.Key_Up || k === Qt.Key_Backtab) {
+                root.step(-1);
+                event.accepted = true;
+            } else if (k === Qt.Key_Right || k === Qt.Key_Down || k === Qt.Key_Tab) {
+                root.step(1);
+                event.accepted = true;
+            } else if (k === Qt.Key_Home) {
+                root.jump(0);
+                event.accepted = true;
+            } else if (k === Qt.Key_End) {
+                root.jump(root.walls.length - 1);
+                event.accepted = true;
+            } else if (k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_Space
+                    || event.text === "\r" || event.text === "\n") {
+                root.apply();
+                event.accepted = true;
+            } else if (k >= 0x01000000) {
+                // unrecognized extended key — surface it (console.log is lost,
+                // warn reaches the qs log). Letters/punctuation stay silent.
+                console.warn("wallswitch: unhandled key", k, JSON.stringify(event.text));
+            }
+        }
+        // belt and braces: some stacks hand Return/Enter to the specific
+        // handlers instead of onPressed — lastApply guards double-fires
+        Keys.onReturnPressed: root.apply()
+        Keys.onEnterPressed: root.apply()
+    }
+}

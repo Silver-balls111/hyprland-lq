@@ -26,6 +26,16 @@ ShellRoot {
         onPressed: Popups.toggle("clock")
     }
 
+    // mainMod+W — the slanted wallpaper picker (replaces the old rofi
+    // wall-switcher.sh flow entirely). Bind line for the user's Lua config:
+    // hl.bind(mainMod .. " + W", hl.dsp.global("qs-bar:wallpapers"))
+    GlobalShortcut {
+        appid: "qs-bar"
+        name: "wallpapers"
+        description: "Toggle the wallpaper picker"
+        onPressed: Popups.toggle("wall")
+    }
+
     // The notification daemon — replaces swaync. Instantiated once here at the
     // shell root (NOT per-screen): only one process can own
     // org.freedesktop.Notifications, and swaync must not be running.
@@ -73,4 +83,9 @@ ShellRoot {
             screen: modelData
         }
     }
+
+    // slanted wallpaper picker (single instance, default screen). Declared
+    // AFTER the bar so its (invisible) input shield stacks above the bar,
+    // same as the other popups: clicking a pill closes the picker first.
+    Wallswitch {}
 }

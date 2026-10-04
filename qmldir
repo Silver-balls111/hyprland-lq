@@ -19,5 +19,6 @@ TooltipWindow 1.0 TooltipWindow.qml
 SignalBars 1.0 SignalBars.qml
 StatusPill 1.0 StatusPill.qml
 Toggle 1.0 Toggle.qml
+Wallswitch 1.0 Wallswitch.qml
 WifiPopup 1.0 WifiPopup.qml
 Workspaces 1.0 Workspaces.qml

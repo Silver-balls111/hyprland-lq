@@ -22,12 +22,12 @@ the config on every file save — you do not need to restart to test QML edits).
 
 | File | Role |
 |---|---|
-| `shell.qml` | Entry point. `//@ pragma UseQApplication` is **required** (tray menus need it). Hosts the two `GlobalShortcut`s (`powermenu`, `notification`), the `NotificationServer` (once, NOT per-screen — see notification gotcha) and the `Toast` window. `Variants` spawns one `Bar` per screen. |
+| `shell.qml` | Entry point. `//@ pragma UseQApplication` is **required** (tray menus need it). Hosts the three `GlobalShortcut`s (`powermenu`, `notification`, `wallpapers`), the `NotificationServer` (once, NOT per-screen — see notification gotcha) and the `Toast`, `Osd` and `Wallswitch` windows. `Variants` spawns one `Bar` per screen (declared BEFORE `Wallswitch` so the picker's dim covers the bar). |
 | `Bar.qml` | 46px `PanelWindow` (layer Top). Anchors the three pills and instantiates the four `RicePopup`s + `TrayMenuPopup`. Also hosts `showTooltip()`/`hideTooltip()` which delegate to `TooltipWindow`. |
 | `Workspaces.qml` | Hyprland workspaces, min 5 persistent slots (`minCount`), click switches via dispatch. Urgent workspaces tint orange. Active cell is wider than idle/hover; first/last delegates draw "cap" circles so the active fill reaches the pill's rounded ends (see Workspaces gotcha). |
 | `ClockPill.qml` | Center pill: stateful bell + time (no clock glyph — removed 2026-10-04). Bell mirrors waybar's notification-module glyphs via `Notifs.unread`/`Notifs.dnd`; unread also boosts color from fgMuted to fg. Owns a `SystemClock`. Hover = date tooltip, click = dashboard popup. |
 | `StatusPill.qml` | Right pill: SystemTray items, volume (scroll ±1% / click mute), mic, wifi, bluetooth, battery, power. Exposes `wifiRightX`/`btRightX`/`powerRightX` so Bar can anchor popups under the right icons — **do not delete these**, the popups depend on them. |
-| `Popups.qml` (singleton) | `active` = name of the open popup ("" / "clock" / "wifi" / "bt" / "power" / "tray"). Single source of truth for popup exclusivity. `lastDismiss` guards against the outside-click that dismissed a popup re-triggering a toggle. |
+| `Popups.qml` (singleton) | `active` = name of the open popup ("" / "clock" / "wifi" / "bt" / "power" / "tray" / "wall"). Single source of truth for popup exclusivity. `lastDismiss` guards against the outside-click that dismissed a popup re-triggering a toggle. |
 | `RicePopup.qml` | Base class for dash/wifi/bt/power popups: full-screen transparent layer-shell "shield", visible rounded panel anchored inside it, closes on outside click / `Esc` / `Popups.active` change. `panelWidth` + optional `panelHeight` (0 = auto-size from content); panel x is clamped to the screen. |
 | `WifiPopup.qml` | Wi-Fi toggle, networks sorted by signal (connected first), max 5 visible + scroll, inline password prompt (`connectWithPsk`). |
 | `BluetoothPopup.qml` | Adapter toggle, devices (paired first), pair/connect/disconnect on click. |
@@ -37,6 +37,7 @@ the config on every file save — you do not need to restart to test QML edits).
 | `NotifsPanel.qml` | Right column of the dashboard: MPRIS player card(s) docked on top (`Mpris.players` filtered to non-stopped), notification history ListView (rows show a hover ✕ — visual only, the row MouseArea handles the click and removes the entry), bell "No Notifications" empty state, footer with DND `Toggle` + `Clear`. |
 | `Notifs.qml` (singleton) | Notification history (plain JS snapshots, capped 30, newest first), `dnd`, current `toast` entry, `push/remove/clearAll/closeToast`. `push` sets `n.tracked = true` — see notification gotcha. |
 | `Toast.qml` | Top-right toast banner (small mapped-only window, TooltipWindow pattern). Timer mirrors the user's old swaync timings: 2s low / 4s normal / 6s critical; app-supplied `expireTimeout` (ms) wins when > 0, clamped 2–15s. Hidden while DND or the dashboard is open. Click = dismiss. |
+| `Wallswitch.qml` | Slanted wallpaper picker (skwd-wall "Slices" look, right-leaning) floating over the live desktop — NO dim backdrop, invisible input shield. 11-slot recycled carousel, preview-first UX; applies via the `awww` + `matugen` binaries directly — the rofi `wall-switcher.sh` is retired (see its section below). |
 | `TrayMenuPopup.qml` | Themed DBusMenu renderer for tray items (`QsMenuOpener`), one submenu drill-down level with a Back row. Scroll position resets on every open. |
 | `TooltipWindow.qml` | Small floating window rendering ONE hover tooltip; positioned via layer-shell margins. Only mapped while showing. |
 | `NIcon.qml` | Fixed-square `Text` rendering one Nerd Font glyph from `Icons`. |
@@ -317,6 +318,82 @@ shows through, `hyprctl layers` still lists the surface, **zero** errors in
 any log). Cause: corrupt `~/.cache/quickshell` and/or
 `/run/user/1000/quickshell/vfs` entries. `rm -rf` both and relaunch — cost
 most of a session before being identified.
+
+### Wallpaper switcher (Wallswitch.qml, 2026-10-04)
+
+skwd-wall's "Slices" picker, ported to QML minus the feature buffet. Replaces
+the rofi `~/.config/rofi/wallpaper-switcher/wall-switcher.sh` flow entirely
+(the script, its `.rasi` theme and the `wall_switch` variable in
+`variables.lua` are dead weight now — the picker shells out to the binaries
+directly).
+
+- **Trigger**: `GlobalShortcut` name `wallpapers` (appid `qs-bar`) →
+  `Popups.toggle("wall")`. User binds e.g.
+  `hl.bind(mainMod .. " + W", hl.dsp.global("qs-bar:wallpapers"))`. The
+  window is instantiated once at shell root AFTER `Variants` — the
+  fullscreen shield is INVISIBLE (no dim; user rejected the dark backdrop:
+  skwd floats over the live desktop) and must stack above the bar so a bar
+  click closes the picker first, matching the other popups' convention.
+- **Apply = two binaries, exact known-good args**: one `sh -c` `Process`,
+  path/transition passed as positional argv (filename-proof):
+  `awww img "$1" --transition-type "$2" --transition-duration 1.2
+  --transition-fps 60 && matugen image "$1" --prefer darkness --config …`.
+  `$2` is a random of fade/wipe/outer/grow/slide (the old script's set).
+  **matugen's `config.toml` must keep `[config.wallpaper] set = false`** —
+  user-verified: with `false` matugen only regenerates templates (incl. the
+  `hyprctl reload` post-hook), with `true` it re-applies the wallpaper with
+  its own `center` transition and would double-apply. There is NO CLI flag
+  to override it (checked 4.2.0 `util/arguments.rs`). awww's non-zero exit
+  short-circuits matugen so the palette can never desync from the wallpaper.
+- **Data**: `find ~/Pictures/wallpapers/images -maxdepth 1 -type f` (same ext
+  glob as the old script, ~472 files, flat) piped to `sort`, plus
+  `awww query` parsed with `(?<=image: ).*` (same as hyprlock-auto.sh). Both
+  re-run on every open; selection resolves when the list lands (the query may
+  arrive before or after it — `resolveSelection()` handles both orders).
+- **Carousel mechanics**: 11 recycled slots each hold a stable `wallIdx`;
+  `layoutSlots()` (on every `centerPos` change) keeps the indices around
+  `floor(centerPos)` assigned, reassigning only far-edge slots whose opacity
+  is ~0. Slot geometry is a pure function of the wrap-around distance
+  `d = wallIdx - centerPos` (`signedDist`): width/shear/dim lerp toward the
+  strip shape, the first strip hugs the center image's edge (`slotOffset()`),
+  later ones step `stripW + gap`. **The center frame is FIXED `slotH * 16/9`**
+  (user-requested: same box for every wallpaper, non-16:9 center-crops — do
+  NOT bind the frame to the image's natural aspect, it rescales the whole
+  row per wallpaper). **The shear is UNIFORM across all slots including the
+  center** — user correction against the reference: skwd leans the whole
+  plane at one angle; an earlier straighten-at-center morph was wrong. `centerPos` has a 260ms OutCubic Behavior **gated by
+  `animateNav && everOpened`** — opens and Home/End must snap, or the first
+  open flies across 471 entries (and `enabled` belongs on the `Behavior`,
+  NOT on the `NumberAnimation` — "Cannot assign to non-existent property").
+- **Keys**: Esc / arrows / `Tab`/`Backtab` / `Home`/`End` / Enter+Space on a
+  focus-sink Item via `Keys.onPressed`, PLUS `Keys.onReturnPressed` and
+  `Keys.onEnterPressed` — the user reported Enter not applying while Space
+  did (unexplained; onPressed should get both). The specific handlers plus a
+  250ms `lastApply` guard in `apply()` make a double delivery a no-op, and
+  any unrecognized extended key (>= 0x01000000) `console.warn`s its code so
+  a repeat report comes with evidence.
+- **Parallelogram slices: shear a clipped WINDOW, never the Image.** The
+  sheared Image is ~`k*slotH` px wider than its strip; with no clip (or a
+  plain `clip: true` on the slot) that content spills over the neighboring
+  slots and hides their chips/strips (cost a debug round). Structure:
+  outer slot → `shearWrap` Item with the `Matrix4x4` → inner window Item
+  (`clip: true`) → Image + dim + border inside. The clip rect transforms
+  WITH the wrapper, giving a clean leaning slice. `m12 = -k` puts the TOP
+  edge to the right (right-leaning, what the user chose over skwd's
+  left-lean); `m14 = k*slotH/2` pivots the shear on the vertical middle.
+- **Decode cost**: `sourceSize.width` quantized to 128px steps (the slot
+  width morphs continuously; an exact binding would re-decode every frame),
+  `sourceSize.height: 0`, `asynchronous: true`, `cache: true`.
+- **Debug pattern that paid off**: binding errors fail SILENTLY to a wrong
+  value — renaming `W`/`H` (uppercase property names are illegal, an
+  existing gotcha) left `slotH: Math.round(H * 0.58)` throwing
+  `ReferenceError` on every eval and reading 0, with zero visual errors and
+  everything else working. A temporary `console.warn` Timer dumping the slot
+  tree (plus a `property alias imgItem: img` for statuses) found it in one
+  run. `console.log` doesn't surface, `console.warn` does.
+
+**TODO (user-requested follow-up): a search/filter for the 472 wallpapers**
+(type-to-narrow or a query field). Not implemented yet.
 
 ## Extra notes / user preferences
 

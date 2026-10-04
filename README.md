@@ -48,10 +48,11 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
    ```
 
 3. **Keybinds** — in `~/.config/hypr/config/keybinds.lua` (the bar registers
-   two global shortcuts under appid `qs-bar`):
+   three global shortcuts under appid `qs-bar`):
    ```lua
    hl.bind(mainMod .. " + X", hl.dsp.global("qs-bar:powermenu"))     -- power popup
    hl.bind(mainMod .. " + N", hl.dsp.global("qs-bar:notification"))  -- dashboard
+   hl.bind(mainMod .. " + W", hl.dsp.global("qs-bar:wallpapers"))    -- wallpaper picker
    ```
    The OSD watches real device state, so volume/brightness keys need no helper
    scripts — call the tools directly (scripts from a swaync setup are fully
@@ -114,6 +115,7 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
 | Bluetooth | Click opens a **dropdown**: toggle adapter, up to 5 devices visible with scroll (paired first), click to pair / connect / disconnect. Icon reflects adapter state; hover tooltip lists connected devices. Keyboard: same as Wi-Fi. |
 | Battery | UPower percentage + state icon (charging/discharging sets, same glyphs as the waybar config); hover tooltip shows time remaining. |
 | Power | Click opens **Lock / Log Out / Reboot / Power Off**. Keyboard: `Tab`/arrows or the wlogout letters (`s`/`r`/`u`/`l`/`h`/`o`), `Enter` runs the action, `Esc` closes. |
+| Wallpaper picker | `SUPER+W` opens a **skwd-wall-style picker** floating over the live desktop (no dim): right-leaning slanted slices of every image in `~/Pictures/wallpapers/images`, the selected one enlarged, upright and accent-bordered in a fixed 16:9 frame (starts on the current wallpaper). Scroll / arrow keys / click a slice to preview it centered; click the centered one or press `Enter`/`Space` to apply — `awww` with a random transition, then `matugen` regenerates the whole palette live (requires `[config.wallpaper] set = false` in matugen's config so it never re-applies the image itself). `Esc` or clicking bare desktop closes. Replaces the old rofi `wall-switcher.sh` flow. |
 
 All icons are **Nerd Font glyphs** (JetBrains Mono Nerd Font Propo) using the
 same codepoints as `~/.config/waybar/config.jsonc` — battery levels, volume,
@@ -137,6 +139,7 @@ clicking a bar pill toggles it directly. Clicks inside a panel never close it.
 | `DashPopup.qml` | Dashboard size (`panelWidth`, `panelHeight`) and column layout |
 | `CalendarPanel.qml` | Calendar rendering (grid, header, month nav) |
 | `NotifsPanel.qml` | Media card, notification rows (hover ✕), empty state, DND + Clear footer |
+| `Wallswitch.qml` | Wallpaper dir, slice geometry (height/width/gap/lean), dim + border, apply command |
 | `Notifs.qml` | History size cap (30), unread/DND logic, OSD-style handling |
 | `Toast.qml` | Toast width, position, per-urgency timings |
 | `RicePopup.qml` | Shared popup shell: anchoring/clamping, panel sizes, close behavior, click swallowing |
