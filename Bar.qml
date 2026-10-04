@@ -57,7 +57,7 @@ PanelWindow {
             barWindow: bar
         }
 
-        CalendarPopup {
+        DashPopup {
             clock: clockPill.clock
             barWindow: bar
             anchorX: clockPill.x + clockPill.width / 2

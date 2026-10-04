@@ -16,6 +16,8 @@ PanelWindow {
     // true: panel centered on anchorX; false: panel's right edge at anchorX
     property bool centerOnAnchor: false
     property int panelWidth: 300
+    // fixed panel height; 0 = auto-size from content (childrenRect)
+    property int panelHeight: 0
     // power-menu style: while open, capture ALL keys so letter keybinds work
     property bool grabKeys: false
     // forwarded from the focused body so subclasses can implement keybinds
@@ -65,7 +67,14 @@ PanelWindow {
 
     Item {
         id: panelArea
-        x: root.centerOnAnchor ? root.anchorX - width / 2 : root.anchorX - width
+        // clamp to the screen: a wide centered panel can otherwise hang off
+        // either edge (anchorX is in bar-window coords; windows share origin)
+        x: {
+            const raw = root.centerOnAnchor ? root.anchorX - width / 2 : root.anchorX - width;
+            const sw = root.screen ? root.screen.width : 0;
+            if (sw <= 0) return raw;
+            return Math.max(8, Math.min(raw, sw - width - 8));
+        }
         y: Theme.barHeight
         width: root.panelWidth
         height: body.height
@@ -73,7 +82,9 @@ PanelWindow {
         Rectangle {
             id: body
             width: parent.width
-            implicitHeight: childrenRect.y + childrenRect.height + 14
+            implicitHeight: root.panelHeight > 0
+                ? Math.min(root.panelHeight, (root.screen ? root.screen.height : 2160) - Theme.barHeight - 12)
+                : childrenRect.y + childrenRect.height + 14
             radius: Theme.popupRadius
             color: Theme.popupBg
             border.width: 1

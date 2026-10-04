@@ -34,7 +34,8 @@ exec-once = qs -c rice        # or: qs -p ~/Documents/Dev/quickshell_rice/shell.
 | Element | Behavior |
 |---|---|
 | Workspaces (1–5+) | Click to switch. Always shows at least 5 slots (extra empty slots create the workspace on click); more appear if you use more. The active workspace's pill widens with the pink fill; a workspace with a window requesting attention is tinted orange until visited. |
-| Clock pill | Hover (or click) opens a **calendar** — always opens on the current month, navigate with the chevrons. Closes when the mouse leaves the popup, on outside click, or `Esc`. |
+| Clock pill | Click opens the **dashboard**: month calendar (left) + notifications with a media player card (right). Always opens on the current month; the player card shows track info with prev/play/next when something is playing. Closes on outside click, `Esc`, or re-click. |
+| Notifications | Quickshell is the notification daemon (replaces swaync). Notifications appear as a top-right **toast banner** (2s low / 4s normal / 6s critical, app-supplied timeouts respected) and land in the dashboard's history (last 30, click a row to remove it, `Clear` wipes it). **Do Not Disturb** silences toasts but keeps history. `SUPER+N` toggles the dashboard via the `qs-bar:dashboard` global shortcut. |
 | System tray | Real StatusNotifier tray with menus (right-click), primary action (left-click) and scroll actions. |
 | Volume | Scroll = ±1%, click = mute/unmute. Mirrors wpctl state. |
 | Mic | Scroll = ±2%, click = mute/unmute. |
@@ -58,6 +59,7 @@ clicking a bar pill toggles it directly.
 - Minimum workspace slots → `minCount` in `Workspaces.qml`
 - Calendar hover open/close delays → `openTimer` / `closeTimer` in `ClockPill.qml`
 - Power menu commands → `PowerPopup.qml`
+- Toast banner timings / width, history size, DND → `Toast.qml` / `Notifs.qml`
 
 All icon glyphs live in `Icons.qml` (Nerd Font codepoints, rendered as text —
 no Canvas or icon theme involved). Colors → `Theme.qml`; minimum workspace

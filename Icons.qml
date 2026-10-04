@@ -56,6 +56,11 @@ QtObject {
         "logout": String.fromCodePoint(0xF05FD),
         "restart": String.fromCodePoint(0xF0709),
         "suspend": String.fromCodePoint(0xF04B2),
-        "hibernate": String.fromCodePoint(0xE7FC)
+        "hibernate": String.fromCodePoint(0xE7FC),
+        "music": String.fromCodePoint(0xF001),
+        "play": String.fromCodePoint(0xF04B),
+        "pause": String.fromCodePoint(0xF04C),
+        "prev": String.fromCodePoint(0xF049),
+        "next": String.fromCodePoint(0xF04D)
     }
 }

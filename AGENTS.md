@@ -21,17 +21,21 @@ the config on every file save — you do not need to restart to test QML edits).
 
 | File | Role |
 |---|---|
-| `shell.qml` | Entry point. `//@ pragma UseQApplication` is **required** (tray menus need it). `Variants` spawns one `Bar` per screen. |
+| `shell.qml` | Entry point. `//@ pragma UseQApplication` is **required** (tray menus need it). Hosts the two `GlobalShortcut`s (powermenu, dashboard), the `NotificationServer` (once, NOT per-screen — see notification gotcha) and the `Toast` window. `Variants` spawns one `Bar` per screen. |
 | `Bar.qml` | 46px `PanelWindow` (layer Top). Anchors the three pills and instantiates the four `RicePopup`s + `TrayMenuPopup`. Also hosts `showTooltip()`/`hideTooltip()` which delegate to `TooltipWindow`. |
 | `Workspaces.qml` | Hyprland workspaces, min 5 persistent slots (`minCount`), click switches via dispatch. Urgent workspaces tint orange. Active cell is wider than idle/hover; first/last delegates draw "cap" circles so the active fill reaches the pill's rounded ends (see Workspaces gotcha). |
-| `ClockPill.qml` | Center pill: clock + bell glyphs. Owns a `SystemClock`. Hover = date tooltip, click = calendar popup. |
+| `ClockPill.qml` | Center pill: clock + bell glyphs. Owns a `SystemClock`. Hover = date tooltip, click = dashboard popup. |
 | `StatusPill.qml` | Right pill: SystemTray items, volume (scroll ±1% / click mute), mic, wifi, bluetooth, battery, power. Exposes `wifiRightX`/`btRightX`/`powerRightX` so Bar can anchor popups under the right icons — **do not delete these**, the popups depend on them. |
 | `Popups.qml` (singleton) | `active` = name of the open popup ("" / "clock" / "wifi" / "bt" / "power" / "tray"). Single source of truth for popup exclusivity. `lastDismiss` guards against the outside-click that dismissed a popup re-triggering a toggle. |
-| `RicePopup.qml` | Base class for wifi/bt/power/calendar popups: full-screen transparent layer-shell "shield", visible rounded panel anchored inside it, closes on outside click / `Esc` / `Popups.active` change. |
+| `RicePopup.qml` | Base class for dash/wifi/bt/power popups: full-screen transparent layer-shell "shield", visible rounded panel anchored inside it, closes on outside click / `Esc` / `Popups.active` change. `panelWidth` + optional `panelHeight` (0 = auto-size from content); panel x is clamped to the screen. |
 | `WifiPopup.qml` | Wi-Fi toggle, networks sorted by signal (connected first), max 5 visible + scroll, inline password prompt (`connectWithPsk`). |
 | `BluetoothPopup.qml` | Adapter toggle, devices (paired first), pair/connect/disconnect on click. |
 | `PowerPopup.qml` | Power Off / Reboot / Suspend / Log Out / Hibernate / Lock (6 rows, 5 visible + scroll). Commands + letter keybinds mirror `~/.config/wlogout/layout`; grabs exclusive keyboard while open (`grabKeys`). |
-| `CalendarPopup.qml` | Month grid, opens on the current month every time, click-opened (no hover behavior). |
+| `DashPopup.qml` | Clock-click dashboard (replaces the old `CalendarPopup`): calendar column (left, 310px) + hairline divider + notifications column (right), fixed `panelHeight` 540 so a playing media card only takes space from the list. `popupName: "clock"`, anchored centered on the clock pill. |
+| `CalendarPanel.qml` | Month grid + weekday/date header, extracted verbatim from the old `CalendarPopup`; `resetMonth()` called by DashPopup on every open. |
+| `NotifsPanel.qml` | Right column of the dashboard: MPRIS player card(s) docked on top (`Mpris.players` filtered to non-stopped), notification history ListView (click row = remove), bell "No Notifications" empty state, footer with DND `Toggle` + `Clear`. |
+| `Notifs.qml` (singleton) | Notification history (plain JS snapshots, capped 30, newest first), `dnd`, current `toast` entry, `push/remove/clearAll/closeToast`. `push` sets `n.tracked = true` — see notification gotcha. |
+| `Toast.qml` | Top-right toast banner (small mapped-only window, TooltipWindow pattern). Timer mirrors the user's old swaync timings: 2s low / 4s normal / 6s critical; app-supplied `expireTimeout` (ms) wins when > 0, clamped 2–15s. Hidden while DND or the dashboard is open. Click = dismiss. |
 | `TrayMenuPopup.qml` | Themed DBusMenu renderer for tray items (`QsMenuOpener`), one submenu drill-down level with a Back row. Scroll position resets on every open. |
 | `TooltipWindow.qml` | Small floating window rendering ONE hover tooltip; positioned via layer-shell margins. Only mapped while showing. |
 | `NIcon.qml` | Fixed-square `Text` rendering one Nerd Font glyph from `Icons`. |
@@ -92,9 +96,38 @@ every tooltip sits at one height.
   = 2, `UPowerDeviceState.Charging` = 1, `BluetoothDeviceState.Connected` = 1,
   `WifiSecurityType.Open` = 10). qmltypes files are incomplete/empty (Hyprland,
   Widgets) — types still exist at runtime.
+- `Mpris` / `MprisPlayer` (`Quickshell.Services.Mpris`, qmltypes complete):
+  `Mpris.players` is an ObjectModel — iterate via `Mpris.players.values` (same
+  as `Networking.devices.values`). `playbackState` is
+  `MprisPlaybackState.Stopped/Playing/Paused`; `trackArtists` is a single
+  QString (NOT a list, despite the name — same backing as `trackArtist`);
+  `trackArtUrl` is a plain URL usable directly in an `Image`; transport
+  methods `togglePlaying()/next()/previous()` guarded by
+  `canTogglePlaying/canGoNext/canGoPrevious`.
+- `NotificationServer` / `Notification` (`Quickshell.Services.Notifications`,
+  qmltypes complete): server is instantiable (NOT a singleton), has NO
+  do-not-disturb property (DND is our own state in `Notifs`). `Notification`
+  has `tracked` (writable — MUST be set true, see gotcha), `expireTimeout`
+  (ms), `urgency` (Low/Normal/Critical), methods `expire()`/`dismiss()`.
 - QML files in this dir require a `qmldir` entry each; singleton + component
   listing the same file twice fails to load; QML property names cannot start
   with an uppercase letter.
+
+### Quickshell owns notifications now — swaync is gone (2026-10-04)
+- The `NotificationServer` in `shell.qml` claims `org.freedesktop.Notifications`.
+  If swaync (or any other daemon) is running, only one of them wins the DBus
+  name — kill swaync before testing (`killall swaync`; it was autostarted from
+  `~/.config/hypr/config/autostart.lua`, which the user removes themselves).
+- **`n.tracked = true` in `onNotification` is not optional.** Without it the
+  Notification wrapper is destroyed as soon as the handler returns, and any
+  later `n.expire()`/`n.dismiss()` (toast timer, click-dismiss) throws
+  `TypeError: ... is not a function` — the toast still *looks* fine, so only
+  the qs log reveals it. History is safe regardless because `Notifs.push`
+  snapshots plain JS data, never the QObject.
+- The server lives at shell root, not inside `Variants`: one DBus owner, and
+  one `Toast`, regardless of screen count.
+- `Notifs.push` drops the toast (expires immediately) when DND is on or the
+  dashboard is open — the entry still lands in history.
 
 ### Icons are Nerd Font glyphs, not fonts-of-opportunity
 All codepoints in `Icons.qml` were taken verbatim from the user's waybar config
@@ -171,7 +204,10 @@ most of a session before being identified.
   against Hyprland 0.56) and is removing wlogout; commands/keybinds stay in
   sync with `~/.config/wlogout/layout` (kept only as reference). `IpcHandler`
   does NOT exist in Quickshell 0.3.1 — GlobalShortcut is the only bind entry
-  point.
+  point. Same pattern for the dashboard: `hl.bind("SUPER + N",
+  hl.dsp.global("qs-bar:dashboard"))` replaces the old swaync toggle bind.
+  Note `hyprctl dispatch global ...` cannot trigger these from a script —
+  it dies in the Lua parser.
 - Live data looks "wrong" sometimes because it *is* live: volume 0% + muted
   icon means the sink actually is, battery follows the real battery (it drains
   between screenshots), bluetooth icon flips with adapter state.
@@ -179,5 +215,13 @@ most of a session before being identified.
   `/run/user/1000/quickshell/<id>/log.qslog`, screenshot with hyprshot + crop
   with `magick`. Non-visual singletons/components can be probed with a throwaway
   QML file run the same way (keep test files out of this repo).
+- Popup layout can be verified without clicking the bar: run a second
+  throwaway `qs` instance from /tmp that imports the repo via
+  `import "file:/home/anuj/Documents/Dev/quickshell_rice"` (bare absolute
+  paths are rejected — the file: URL is mandatory), flips
+  `Popups.active = "<name>"` in `Component.onCompleted` (optionally seeding
+  singleton state like `Notifs.history` first), then grim-crops the panel
+  region. Two instances coexist fine as long as the throwaway has no
+  `NotificationServer`.
 - If a newer Quickshell lands in Arch `extra` (>0.3.1), re-verify this config
   before assuming it still works — deprecation warnings are the first sign.

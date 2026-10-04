@@ -27,6 +27,8 @@ QtObject {
     readonly property color inputBg: Qt.rgba(1, 1, 1, 0.5)
     readonly property color archBlue: "#1793d1"
     readonly property color danger: "#c4586e"
+    // column separator inside the dashboard popup
+    readonly property color divider: Qt.rgba(fg.r, fg.g, fg.b, 0.12)
 
     // metrics
     readonly property int barHeight: 46

@@ -1,20 +1,15 @@
 import QtQuick
-import Quickshell
 
-RicePopup {
+// Calendar column of the dashboard popup (DashPopup). Logic extracted verbatim
+// from the old CalendarPopup; DashPopup resets viewDate every time it opens.
+Item {
     id: root
 
-    popupName: "clock"
-    panelWidth: 300
-    centerOnAnchor: true
-
-    // set by Bar.qml
     property var clock: null
 
-    // always open on the current month, even if the user browsed away last time
-    onVisibleChanged: {
-        if (visible && root.clock)
-            viewDate = new Date(root.clock.date.getFullYear(), root.clock.date.getMonth(), 1);
+    function resetMonth() {
+        if (root.clock)
+            viewDate = new Date(clock.date.getFullYear(), clock.date.getMonth(), 1);
     }
 
     property date viewDate: root.clock ? new Date(root.clock.date.getFullYear(), root.clock.date.getMonth(), 1) : new Date()
@@ -35,11 +30,9 @@ RicePopup {
     }
 
     Column {
-        id: content
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.margins: 14
         spacing: 7
 
         Text {
