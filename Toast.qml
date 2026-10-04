@@ -17,6 +17,10 @@ PanelWindow {
         top: true
         right: true
     }
+    // must ignore exclusive zones — otherwise Hyprland pushes the toast below
+    // the bar's 46px zone (same gotcha as TooltipWindow)
+    exclusionMode: ExclusionMode.Normal
+    exclusiveZone: -1
     implicitWidth: 400
     implicitHeight: Math.max(56, toastCol.implicitHeight + 20)
     margins.right: 10

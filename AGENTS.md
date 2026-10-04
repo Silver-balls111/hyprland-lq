@@ -21,10 +21,10 @@ the config on every file save — you do not need to restart to test QML edits).
 
 | File | Role |
 |---|---|
-| `shell.qml` | Entry point. `//@ pragma UseQApplication` is **required** (tray menus need it). Hosts the two `GlobalShortcut`s (powermenu, dashboard), the `NotificationServer` (once, NOT per-screen — see notification gotcha) and the `Toast` window. `Variants` spawns one `Bar` per screen. |
+| `shell.qml` | Entry point. `//@ pragma UseQApplication` is **required** (tray menus need it). Hosts the two `GlobalShortcut`s (`powermenu`, `notification`), the `NotificationServer` (once, NOT per-screen — see notification gotcha) and the `Toast` window. `Variants` spawns one `Bar` per screen. |
 | `Bar.qml` | 46px `PanelWindow` (layer Top). Anchors the three pills and instantiates the four `RicePopup`s + `TrayMenuPopup`. Also hosts `showTooltip()`/`hideTooltip()` which delegate to `TooltipWindow`. |
 | `Workspaces.qml` | Hyprland workspaces, min 5 persistent slots (`minCount`), click switches via dispatch. Urgent workspaces tint orange. Active cell is wider than idle/hover; first/last delegates draw "cap" circles so the active fill reaches the pill's rounded ends (see Workspaces gotcha). |
-| `ClockPill.qml` | Center pill: clock + bell glyphs. Owns a `SystemClock`. Hover = date tooltip, click = dashboard popup. |
+| `ClockPill.qml` | Center pill: stateful bell + time (no clock glyph — removed 2026-10-04). Bell mirrors waybar's notification-module glyphs via `Notifs.unread`/`Notifs.dnd`; unread also boosts color from fgMuted to fg. Owns a `SystemClock`. Hover = date tooltip, click = dashboard popup. |
 | `StatusPill.qml` | Right pill: SystemTray items, volume (scroll ±1% / click mute), mic, wifi, bluetooth, battery, power. Exposes `wifiRightX`/`btRightX`/`powerRightX` so Bar can anchor popups under the right icons — **do not delete these**, the popups depend on them. |
 | `Popups.qml` (singleton) | `active` = name of the open popup ("" / "clock" / "wifi" / "bt" / "power" / "tray"). Single source of truth for popup exclusivity. `lastDismiss` guards against the outside-click that dismissed a popup re-triggering a toggle. |
 | `RicePopup.qml` | Base class for dash/wifi/bt/power popups: full-screen transparent layer-shell "shield", visible rounded panel anchored inside it, closes on outside click / `Esc` / `Popups.active` change. `panelWidth` + optional `panelHeight` (0 = auto-size from content); panel x is clamped to the screen. |
@@ -75,12 +75,14 @@ empty/stale mask makes the whole bar click-through. The bar window is a plain
 instead of a full-screen overlay with an "empty" mask — 0.3.1 may ignore such
 masks, and a full-screen tooltip overlay then eats every click.
 
-### Tooltip positioning
+### Tooltip + toast positioning
 The tooltip window is top+left anchored and positioned via `margins`. It must
 set `exclusionMode: Normal; exclusiveZone: -1`, otherwise Hyprland shifts it
-below the bar's 46px exclusive zone (~46px too low). Vertical gap convention:
-pill bottom + 6px; all status tooltips pass the whole pill as the `yItem` so
-every tooltip sits at one height.
+below the bar's 46px exclusive zone (~46px too low). `Toast.qml` needs the
+same two lines (forgot them initially — the banner rendered ~46px too low).
+Vertical gap convention: pill bottom + 6px; all status tooltips pass the whole
+pill as the `yItem` so every tooltip sits at one height. Toast sits at
+`barHeight + 8` on the right.
 
 ### Services API quirks (verified on 0.3.1)
 - `Pipewire`, `Networking`, `UPower`, `SystemTray` are **singletons** — never
@@ -118,24 +120,66 @@ every tooltip sits at one height.
   If swaync (or any other daemon) is running, only one of them wins the DBus
   name — kill swaync before testing (`killall swaync`; it was autostarted from
   `~/.config/hypr/config/autostart.lua`, which the user removes themselves).
+- **If notifications ever disappear mysteriously, suspect name theft.** This
+  happened once (2026-10-04): the user had a GNOME session open for reference,
+  and its standalone notification daemon (a dbus-activatable `gjs` process
+  running `/usr/share/gnome-shell/org.gnome.Shell.Notifications`) grabbed
+  `org.freedesktop.Notifications` the moment it was free. Symptom: no toasts,
+  and the qs log only says "Could not register notification server ... already
+  registered". Diagnosis: `busctl --user list | grep Notifications` — see who
+  owns the name (another session's daemon, swaync, dunst, mako, ...). Close
+  the other daemon/session and quickshell re-registers automatically — no bar
+  restart needed. A cheap guard is still in place:
+  `~/.config/dbus-1/services/org.gnome.Shell.Notifications.service` with
+  `Exec=/bin/false` shadows the dbus activation for this user (harmless
+  outside GNOME sessions; delete if unwanted).
 - **`n.tracked = true` in `onNotification` is not optional.** Without it the
   Notification wrapper is destroyed as soon as the handler returns, and any
   later `n.expire()`/`n.dismiss()` (toast timer, click-dismiss) throws
   `TypeError: ... is not a function` — the toast still *looks* fine, so only
   the qs log reveals it. History is safe regardless because `Notifs.push`
   snapshots plain JS data, never the QObject.
+- **OSD protocol from the user's volume/brightness scripts** (~/.config/hypr/
+  scripts/volume.sh, brightness.sh): they send `notify-send -e
+  -h string:x-canonical-private-synchronous:<tag> -h int:value:<pct>
+  -i <png from ~/.config/swaync/icons>`. `Notifs.push` detects the sync hint
+  (or `n.transient`) and treats such notifications as OSD feedback: toast
+  replaces the current one, no history, no unread count. `osdTag`/`osdValue`
+  are kept on the entry for the future in-quickshell OSD (brightness/volume
+  slider rendering) — that's the intended replacement for these scripts.
 - The server lives at shell root, not inside `Variants`: one DBus owner, and
   one `Toast`, regardless of screen count.
 - `Notifs.push` drops the toast (expires immediately) when DND is on or the
-  dashboard is open — the entry still lands in history.
+  dashboard is open — the entry still lands in history (unread counts up).
+  Opening the dashboard calls `Notifs.markRead()`.
+- The clock pill's bell is stateful (waybar notification-module glyph set):
+  none F009C / unread F116B / dnd+unread F00A0 / dnd+quiet F0A93.
+- Note: `notify-send` works fine in the user's own session (verified by the
+  user; their volume/brightness keybind scripts reach the bar end-to-end). An
+  earlier "undefined symbol notify_notification_get_activation_app_launch_context"
+  failure happened ONLY inside the agent's exec shell — its library environment
+  differs from the user's session, so don't conclude "tool X is broken
+  system-wide" from agent-shell failures. To send test notifications from the
+  agent shell, use `dbus-send` against org.freedesktop.Notifications instead.
 
 ### Icons are Nerd Font glyphs, not fonts-of-opportunity
 All codepoints in `Icons.qml` were taken verbatim from the user's waybar config
 (battery level/charging arrays, volume low/high/muted, mic, wifi, bluetooth,
-clock, bell). Power intentionally uses the md power glyph (font-metric
-alignment), not the ⏻ text char. `Icons.yOffset(name)` holds pixel corrections
-measured by rendering glyphs against JetBrains Mono text — update it if you add
-glyphs. BT device rows all use the plain bluetooth glyph (matches waybar).
+bell quartet). Power intentionally uses the md power glyph (font-metric
+alignment), not the ⏻ text char. The bell set (`bell`/`bellRing`/`bellDnd`/
+`bellSleep`) comes from the `custom/notification` module's format-icons:
+none F009C / unread F116B / dnd+unread F00A0 / dnd+quiet F0A93. Media transport
+glyphs are NOT in the waybar config: play f04b, pause f04c, prev f049 (◀◀),
+next f04e (▶▶), music f001.
+`Icons.yOffset(name)` holds pixel corrections measured by rendering glyphs
+against JetBrains Mono text — update it if you add glyphs. BT device rows all
+use the plain bluetooth glyph (matches waybar).
+
+**Font coverage lies: a codepoint in the cmap can still render wrong.** `next`
+was initially f04d (fa-step-forward) — fc-query lists it as covered, but in
+JetBrains Mono Nerd Font Propo it renders as a **filled square** (codepoint
+collision). Always render-test new glyphs with a throwaway qs instance +
+`grim` before committing them; don't trust fc-query alone.
 
 ### Workspaces pill: edge caps, per-state widths, and the silent Repeater-id trap
 State of `Workspaces.qml` after the 2026-10-04 debug session (uncommitted at
@@ -204,8 +248,9 @@ most of a session before being identified.
   against Hyprland 0.56) and is removing wlogout; commands/keybinds stay in
   sync with `~/.config/wlogout/layout` (kept only as reference). `IpcHandler`
   does NOT exist in Quickshell 0.3.1 — GlobalShortcut is the only bind entry
-  point. Same pattern for the dashboard: `hl.bind("SUPER + N",
-  hl.dsp.global("qs-bar:dashboard"))` replaces the old swaync toggle bind.
+  point. Same pattern for the dashboard: `hl.dsp.global("qs-bar:notification")`
+  (the user binds mainMod+N themselves; mainMod = ALT in their config; the
+  shortcut only toggles — no keyboard grab).
   Note `hyprctl dispatch global ...` cannot trigger these from a script —
   it dies in the Lua parser.
 - Live data looks "wrong" sometimes because it *is* live: volume 0% + muted

@@ -5,7 +5,8 @@ import Quickshell.Hyprland
 import Quickshell.Services.Notifications
 
 ShellRoot {
-    // ALT+X (bound in hyprland config as: hl.bind("ALT + X", hl.dsp.global("qs-bar:powermenu")))
+    // mainMod+X (bound in the hyprland Lua config as:
+    // hl.bind(mainMod .. " + X", hl.dsp.global("qs-bar:powermenu")))
     // toggles the power popup — the wlogout replacement workflow.
     GlobalShortcut {
         appid: "qs-bar"
@@ -14,11 +15,12 @@ ShellRoot {
         onPressed: Popups.toggle("power")
     }
 
-    // SUPER+N — replaces the old swaync toggle bind:
-    // hl.bind("SUPER + N", hl.dsp.global("qs-bar:dashboard"))
+    // mainMod+N — toggles the clock dashboard (calendar + notifications), same
+    // pattern as the power menu. The user binds it in their Lua config, e.g.:
+    // hl.bind(mainMod .. " + N", hl.dsp.global("qs-bar:notification"))
     GlobalShortcut {
         appid: "qs-bar"
-        name: "dashboard"
+        name: "notification"
         description: "Toggle the clock dashboard (calendar + notifications)"
         onPressed: Popups.toggle("clock")
     }

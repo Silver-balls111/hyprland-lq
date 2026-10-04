@@ -15,10 +15,13 @@ RicePopup {
     // set by Bar.qml
     property var clock: null
 
-    // always open on the current month, even if the user browsed away last time
+    // always open on the current month, even if the user browsed away last time;
+    // opening the dashboard counts as having seen the notifications
     onVisibleChanged: {
-        if (visible)
+        if (visible) {
             calPanel.resetMonth();
+            Notifs.markRead();
+        }
     }
 
     Row {

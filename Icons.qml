@@ -20,6 +20,9 @@ QtObject {
 
     readonly property var yOffsets: {
         "bell": 0.5,
+        "bellRing": 0.5,
+        "bellDnd": 0.5,
+        "bellSleep": 0.5,
         "wifiOff": 0.5,
         "bluetooth": 0.5,
         "power": -1
@@ -46,8 +49,10 @@ QtObject {
         "wifiOff": String.fromCodePoint(0xF05AA),
         "bluetooth": String.fromCodePoint(0xF294),
         "bluetoothOff": String.fromCodePoint(0xF00B2),
-        "clock": String.fromCodePoint(0xF43A),
         "bell": String.fromCodePoint(0xF009C),
+        "bellRing": String.fromCodePoint(0xF116B),
+        "bellDnd": String.fromCodePoint(0xF00A0),
+        "bellSleep": String.fromCodePoint(0xF0A93),
         "power": String.fromCodePoint(0xF0425),
         "chevronLeft": String.fromCodePoint(0xF0141),
         "chevronRight": String.fromCodePoint(0xF0142),
@@ -60,7 +65,9 @@ QtObject {
         "music": String.fromCodePoint(0xF001),
         "play": String.fromCodePoint(0xF04B),
         "pause": String.fromCodePoint(0xF04C),
+        // f04d renders as a filled SQUARE in this font (codepoint collision) —
+        // "forward" f04e is the ▶▶ pair-mate of "prev" f049's ◀◀
         "prev": String.fromCodePoint(0xF049),
-        "next": String.fromCodePoint(0xF04D)
+        "next": String.fromCodePoint(0xF04E)
     }
 }

@@ -1,7 +1,8 @@
 import QtQuick
 import Quickshell
 
-// Center pill: clock + bell. Shows the calendar when hovered (or clicked).
+// Center pill: stateful bell + time. Bell mirrors waybar's notification-module
+// glyphs (none/notification/dnd variants); click opens the dashboard.
 Pill {
     id: root
 
@@ -18,8 +19,12 @@ Pill {
 
     NIcon {
         anchors.verticalCenter: parent.verticalCenter
-        name: "clock"
+        // stateful bell from the user's waybar notification-module glyph set:
+        // unread+DND → bellDnd, unread → bellRing, DND+quiet → bellSleep, quiet → bell
+        name: Notifs.unread > 0 ? (Notifs.dnd ? "bellDnd" : "bellRing")
+                                : (Notifs.dnd ? "bellSleep" : "bell")
         iconSize: 15
+        iconColor: Notifs.unread > 0 ? Theme.fg : Theme.fgMuted
     }
 
     Text {
@@ -29,12 +34,6 @@ Pill {
         font.family: Theme.fontFamily
         font.pixelSize: 14
         font.weight: Font.Bold
-    }
-
-    NIcon {
-        anchors.verticalCenter: parent.verticalCenter
-        name: "bell"
-        iconSize: 15
     }
 
     HoverHandler {
