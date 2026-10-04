@@ -37,7 +37,8 @@ the config on every file save — you do not need to restart to test QML edits).
 | `NotifsPanel.qml` | Right column of the dashboard: MPRIS player card(s) docked on top (`Mpris.players` filtered to non-stopped), notification history ListView (rows show a hover ✕ — visual only, the row MouseArea handles the click and removes the entry), bell "No Notifications" empty state, footer with DND `Toggle` + `Clear`. |
 | `Notifs.qml` (singleton) | Notification history (plain JS snapshots, capped 30, newest first), `dnd`, current `toast` entry, `push/remove/clearAll/closeToast`. `push` sets `n.tracked = true` — see notification gotcha. |
 | `Toast.qml` | Top-right toast banner (small mapped-only window, TooltipWindow pattern). Timer mirrors the user's old swaync timings: 2s low / 4s normal / 6s critical; app-supplied `expireTimeout` (ms) wins when > 0, clamped 2–15s. Hidden while DND or the dashboard is open. Click = dismiss. |
-| `Wallswitch.qml` | Slanted wallpaper picker (skwd-wall "Slices" look, right-leaning) floating over the live desktop — NO dim backdrop, invisible input shield. 11-slot recycled carousel, preview-first UX; applies via the `awww` + `matugen` binaries directly — the rofi `wall-switcher.sh` is retired (see its section below). |
+| `Wallswitch.qml` | Slanted wallpaper picker (skwd-wall "Slices" look, right-leaning) floating over the live desktop — NO dim backdrop, invisible input shield. 11→9-slot recycled carousel, preview-first UX; applies via the `awww` + `matugen` binaries directly — the rofi `wall-switcher.sh` is retired (see its section below). |
+| `shaders/` | Prebuilt `.qsb` shaders for Wallswitch's slot rendering (AA'd parallelogram mask). Sources kept alongside; recompile command in the wallpaper section. |
 | `TrayMenuPopup.qml` | Themed DBusMenu renderer for tray items (`QsMenuOpener`), one submenu drill-down level with a Back row. Scroll position resets on every open. |
 | `TooltipWindow.qml` | Small floating window rendering ONE hover tooltip; positioned via layer-shell margins. Only mapped while showing. |
 | `NIcon.qml` | Fixed-square `Text` rendering one Nerd Font glyph from `Icons`. |
@@ -381,13 +382,41 @@ directly).
   selected-slot condition avoids the two-chips-at-midpoint flicker a
   `|d| < 0.5` gate would give mid-animation, and it's a pure visibility
   toggle (no image reloads involved).
-- **Keys**: Esc / arrows / `Tab`/`Backtab` / `Home`/`End` / Enter+Space on a
-  focus-sink Item via `Keys.onPressed`, PLUS `Keys.onReturnPressed` and
-  `Keys.onEnterPressed` — the user reported Enter not applying while Space
-  did (unexplained; onPressed should get both). The specific handlers plus a
-  250ms `lastApply` guard in `apply()` make a double delivery a no-op, and
-  any unrecognized extended key (>= 0x01000000) `console.warn`s its code so
-  a repeat report comes with evidence.
+- **Keys** (all user-confirmed working): Esc / arrows / `Tab`/`Backtab` /
+  `Home`/`End` / Enter+Space on a focus-sink Item via `Keys.onPressed`, PLUS
+  `Keys.onReturnPressed` and `Keys.onEnterPressed` — Enter did not apply
+  until the specific handlers existed (Space worked all along from
+  onPressed; root cause never explained). A 250ms `lastApply` guard in
+  `apply()` makes a double delivery a no-op, and any unrecognized extended
+  key (>= 0x01000000) `console.warn`s its code. The `dimaround` layer rule
+  on `quickshell:wallswitch` is also user-confirmed.
+- **Jagged slanted edges: they live in a fragment shader now** — and there
+  was NO simpler fix, don't re-litigate: a transformed quad's edges are
+  rasterized WITHOUT anti-aliasing; `clip: true` is binary scissor/stencil;
+  `layer.enabled/smooth/samples` only change texture *sampling* (the quad
+  boundary stays hard — this was tried and did NOT fix it, don't claim it
+  does again); Quickshell 0.3.1 exposes no window-MSAA property (checked the
+  qmltypes). So each slot is a `ShaderEffect` with prebuilt `.qsb` shaders
+  (`shaders/wallslot.{vert,frag}.qsb`, editable sources kept beside them)
+  that masks the parallelogram with a 1px `smoothstep` and draws image +
+  dim + accent border analytically. qsb workflow gotchas (all hit live):
+  - Qt 6 ShaderEffect takes ONLY `.qsb` URLs — runtime GLSL strings are
+    treated as file paths and fail. Recompile after editing:
+    `/usr/lib/qt6/bin/qsb --glsl "100es,440" --hlsl 50 --msl 12 -o X.qsb X`
+    (`--glsl 100es` alone is NOT enough — the desktop-GL backend tries
+    versions 120..460 and errors "No GLSL shader code found").
+  - The vertex shader must declare `qt_TexCoord0` (location 1) even when
+    unused — Qt's quad mesh provides it and the material validates inputs.
+  - The uniform block is `qt_Matrix`, `qt_Opacity`, then the QML custom
+    properties in ALPHABETICAL order (std140, binding 0); the sampler is
+    `layout(binding = 1)`.
+  - Empirical AA check that settles "still jagged?" without eyeballing:
+    dump one pixel row crossing the border (`magick ... txt:`) —
+    anti-aliased edges show intermediate blended values, aliased ones jump
+    straight from border color to background.
+  - Test-instance trap: a throwaway never runs shell.qml, so Theme keeps
+    DEFAULTS — the border reads default pink #f7c2d1 in test screenshots
+    and the matugen accent in the live bar. Don't scan for the wrong color.
 - **Parallelogram slices: shear a clipped WINDOW, never the Image.** The
   sheared Image is ~`k*slotH` px wider than its strip; with no clip (or a
   plain `clip: true` on the slot) that content spills over the neighboring
@@ -442,7 +471,9 @@ directly).
 - Debugging loop that works: `qs -p <file-or-dir>` in background, read stderr /
   `/run/user/1000/quickshell/<id>/log.qslog`, screenshot with hyprshot + crop
   with `magick`. Non-visual singletons/components can be probed with a throwaway
-  QML file run the same way (keep test files out of this repo).
+  QML file run the same way (keep test files out of this repo). **Kill throwaway
+  instances when done** — a stray `qs -p shell.qml` from an old session survived
+  a day and pixel-overlapped the real `qs -c topbar` bar invisibly.
 - Popup layout can be verified without clicking the bar: run a second
   throwaway `qs` instance from /tmp that imports the repo via
   `import "file:/home/anuj/Documents/Dev/quickshell_rice"` (bare absolute
