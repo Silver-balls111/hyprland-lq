@@ -371,6 +371,20 @@ store` daemon — the daemon and cliphist db are never touched by the shell.
   the list; a 2s poll surfaces it; a pinned card legitimately sits above).
   Restoring also leaves the old entry behind as a duplicate in cliphist —
   same artifact the rofi flow had, not worth solving.
+- **Qt's V4 `Array.sort` is NOT stable** (cost the user a "recency broken"
+  round): the pinned-first `sort()` with an all-zero comparator (no pins)
+  silently permuted cliphist's newest-first order into an arbitrary one.
+  Ordering that must preserve an underlying sequence is built with
+  `filter` + `concat` partitioning (stable by construction), never `sort()`
+  — `ordered` is the identity when no pins exist. Verified by dumping panel
+  ids vs `cliphist list` ids side by side.
+- **Per-popup layer namespaces**: RicePopup's namespace is a property
+  (`layerNamespace`, default `quickshell:popup`); ClipboardPopup overrides
+  it to `quickshell:clipboard` — that's the string to match in Hyprland
+  layerrules (e.g. `dimaround`). Search row + card insets use `Theme.track`
+  (fg-derived) — `inputBg` is plain white and washes out on light palettes.
+  Expand state (`expandedText`/`bigImages`) resets on every open; pins
+  deliberately do not (they reload from the sidecar).
 - **Buttons are mouse-only by design**: ⤢/☆/✕ are plain MouseAreas — never
   focused, not in the tab order, no keybinds. Keyboard exists solely to
   iterate cards (fast list walking): Tab/Backtab/Up/Down move, Enter

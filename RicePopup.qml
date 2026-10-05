@@ -26,6 +26,9 @@ PanelWindow {
     property bool keyNavEnabled: false
     // power-menu style: while open, capture ALL keys so letter keybinds work
     property bool grabKeys: false
+    // layer namespace (Hyprland layerrules match on it) — subclasses with
+    // their own rules (e.g. dimaround) override this
+    property string layerNamespace: "quickshell:popup"
     // forwarded from the focused body so subclasses can implement keybinds
     signal keyPressed(var event)
 
@@ -41,7 +44,7 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: root.grabKeys || root.keyNavEnabled
         ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand
-    WlrLayershell.namespace: "quickshell:popup"
+    WlrLayershell.namespace: root.layerNamespace
 
     onVisibleChanged: {
         if (!root.visible && Popups.active === root.popupName) {

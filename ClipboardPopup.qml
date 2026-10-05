@@ -15,10 +15,11 @@ RicePopup {
 
     popupName: "clip"
     keyNavEnabled: true
+    layerNamespace: "quickshell:clipboard"
 
     // ---- tweak me ----
     property int panelW: 640      // -> panelWidth
-    property int panelH: 600      // -> panelHeight (clamped to the screen)
+    property int panelH: 550      // -> panelHeight (clamped to the screen)
     panelWidth: panelW
     panelHeight: panelH
     // position knobs: horizontal center via anchorX + centerOnAnchor, vertical
@@ -47,9 +48,12 @@ RicePopup {
         return pins.indexOf(id) !== -1;
     }
 
-    // pinned cards first (stable sort keeps cliphist recency inside groups)
-    readonly property var ordered:
-        entries.slice().sort((a, b) => (isPinned(b.id) ? 1 : 0) - (isPinned(a.id) ? 1 : 0))
+    // pinned cards first — WITHOUT Array.sort: Qt's V4 sort is NOT stable,
+    // so a "stable" pin comparator still scrambles cliphist's recency order
+    // (verified live). Partition with filter+concat = stable by construction;
+    // with no pins this is the identity (cliphist order = newest first).
+    readonly property var ordered: !pins.length ? entries : entries.filter(
+        e => isPinned(e.id)).concat(entries.filter(e => !isPinned(e.id)))
 
     readonly property var counts: {
         let t = 0, i = 0, l = 0;
@@ -104,6 +108,10 @@ RicePopup {
             searchField.clear();
             activeCat = "all";
             selIndex = 0;
+            // expand state is per-open — collapse everything (pins are
+            // unaffected: they reload from the sidecar right after)
+            expandedText = {};
+            bigImages = [];
             listProc.running = true;
             pinsReader.running = true;
             searchField.forceActiveFocus();
@@ -290,7 +298,9 @@ RicePopup {
             Layout.fillWidth: true
             Layout.preferredHeight: 38
             radius: 12
-            color: Theme.inputBg
+            // same fg-derived tone as the cards — inputBg is plain white on
+            // light palettes and clashes with the panel
+            color: Theme.track
 
             NIcon {
                 anchors.left: parent.left
