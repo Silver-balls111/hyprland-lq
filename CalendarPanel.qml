@@ -24,12 +24,18 @@ Item {
     // only as many week rows as the month needs (no blank filler row)
     readonly property int gridRows: Math.ceil((firstOffset + daysInMonth) / 7)
 
+    // height of the calendar content (header + nav + weekday row + grid) —
+    // DashPopup sizes the panel to this so the system-usage section below
+    // never overlaps
+    readonly property real contentHeight: col.implicitHeight
+
     function isToday(d) {
         return root.clock && d.getFullYear() === root.clock.date.getFullYear()
             && d.getMonth() === root.clock.date.getMonth() && d.getDate() === root.clock.date.getDate();
     }
 
     Column {
+        id: col
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top

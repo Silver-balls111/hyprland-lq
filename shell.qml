@@ -6,6 +6,11 @@ import Quickshell.Io
 import Quickshell.Services.Notifications
 
 ShellRoot {
+    // starts the screen-time accumulator (singleton — lazily created, so it
+    // needs an explicit first touch; it must count all day even if the
+    // dashboard is never opened)
+    Component.onCompleted: ScreenTime.init()
+
     // mainMod+X (bound in the hyprland Lua config as:
     // hl.bind(mainMod .. " + X", hl.dsp.global("qs-bar:powermenu")))
     // toggles the power popup — the wlogout replacement workflow.

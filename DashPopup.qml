@@ -16,11 +16,18 @@ RicePopup {
     property var clock: null
 
     // always open on the current month, even if the user browsed away last time;
-    // opening the dashboard counts as having seen the notifications
+    // opening the dashboard counts as having seen the notifications. The
+    // system-usage section polls only while open. (NB: this handler shadows
+    // RicePopup's onVisibleChanged — subclass handlers always do — which is
+    // fine here because DashPopup needs none of the base bookkeeping; if that
+    // ever changes, switch to a Connections like other subclasses.)
     onVisibleChanged: {
         if (visible) {
             calPanel.resetMonth();
             Notifs.markRead();
+            sysUsage.start();
+        } else {
+            sysUsage.stop();
         }
     }
 
@@ -29,11 +36,23 @@ RicePopup {
         anchors.margins: 14
         spacing: 12
 
-        CalendarPanel {
-            id: calPanel
+        Item {
             width: 310
             height: parent.height
-            clock: root.clock
+
+            CalendarPanel {
+                id: calPanel
+                width: parent.width
+                height: calPanel.contentHeight
+                clock: root.clock
+            }
+
+            SystemUsage {
+                id: sysUsage
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+            }
         }
 
         Rectangle {

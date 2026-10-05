@@ -77,6 +77,13 @@ QtObject {
         "shrink": String.fromCodePoint(0xF0615),
         "star": String.fromCodePoint(0xF006),
         "starFill": String.fromCodePoint(0xF005),
-        "clipboard": String.fromCodePoint(0xF0EA)
+        "clipboard": String.fromCodePoint(0xF0EA),
+        // system usage panel (dashboard) — md-* glyphs, names read from the
+        // font's own glyph table and render-tested (cmap presence can lie)
+        "clock": String.fromCodePoint(0xF0150),
+        "monitor": String.fromCodePoint(0xF0379),
+        "cpu": String.fromCodePoint(0xF061A),
+        "memory": String.fromCodePoint(0xF035B),
+        "disk": String.fromCodePoint(0xF02CA)
     }
 }

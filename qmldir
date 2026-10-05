@@ -3,6 +3,7 @@ singleton Icons 1.0 Icons.qml
 singleton Popups 1.0 Popups.qml
 singleton Notifs 1.0 Notifs.qml
 singleton LockState 1.0 LockState.qml
+singleton ScreenTime 1.0 ScreenTime.qml
 Bar 1.0 Bar.qml
 BluetoothPopup 1.0 BluetoothPopup.qml
 CalendarPanel 1.0 CalendarPanel.qml
@@ -16,6 +17,7 @@ Osd 1.0 Osd.qml
 Pill 1.0 Pill.qml
 PowerPopup 1.0 PowerPopup.qml
 RicePopup 1.0 RicePopup.qml
+SystemUsage 1.0 SystemUsage.qml
 Toast 1.0 Toast.qml
 TrayMenuPopup 1.0 TrayMenuPopup.qml
 TooltipWindow 1.0 TooltipWindow.qml

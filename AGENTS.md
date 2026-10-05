@@ -35,8 +35,10 @@ the config on every file save — you do not need to restart to test QML edits).
 | `WifiPopup.qml` | Wi-Fi toggle, networks sorted by signal (connected first), max 5 visible + scroll, inline password prompt (`connectWithPsk`). |
 | `BluetoothPopup.qml` | Adapter toggle, devices (paired first), pair/connect/disconnect on click. |
 | `PowerPopup.qml` | Power Off / Reboot / Suspend / Log Out / Hibernate / Lock (6 rows, 5 visible + scroll). Commands + letter keybinds mirror `~/.config/wlogout/layout`; grabs exclusive keyboard while open (`grabKeys`). |
-| `DashPopup.qml` | Clock-click dashboard (replaces the old `CalendarPopup`): calendar column (left, 310px) + hairline divider + notifications column (right), fixed `panelHeight` 540 so a playing media card only takes space from the list. `popupName: "clock"`, anchored centered on the clock pill. |
-| `CalendarPanel.qml` | Month grid + weekday/date header, extracted verbatim from the old `CalendarPopup`; `resetMonth()` called by DashPopup on every open. |
+| `DashPopup.qml` | Clock-click dashboard (replaces the old `CalendarPopup`): calendar column (left, 310px) + hairline divider + notifications column (right), fixed `panelHeight` 540 so a playing media card only takes space from the list. `popupName: "clock"`, anchored centered on the clock pill. Below the calendar sits the system-usage section (uptime/screen time + CPU/mem/disk bars) — start()/stop() on open/close. |
+| `CalendarPanel.qml` | Month grid + weekday/date header, extracted verbatim from the old `CalendarPopup`; `resetMonth()` called by DashPopup on every open. Exposes `contentHeight` (its content Column's implicitHeight) — DashPopup sizes the panel to it so the SystemUsage section bottom-anchored under it never overlaps (worst-case 6-week month still leaves ~230px; SystemUsage needs ~145px). |
+| `SystemUsage.qml` | Bottom section of the dashboard's calendar column: uptime + screen-time row, then CPU (% · °C) / Memory / total-Disk bar rows (OSD-style 6px track+accent bars). Quickshell 0.3.1 has NO system-info service — everything is polled from `/proc` + `/sys` + `df` with FileView+Timer (see its section below). |
+| `ScreenTime.qml` (singleton) | Cumulative "screen time today" accumulator (Android-style, resets at midnight). `IdleMonitor` (ext-idle-notify, 330s, inhibitors respected) mirrors the user's hypridle DPMS-off listener; persists to `~/.cache/quickshell_rice/screen-time` (`<yyyy-MM-dd> <seconds>` sidecar). Must run all day even when the dashboard is never opened → singleton, `init()` called from shell.qml `Component.onCompleted` (singletons are lazy — without that first touch NOTHING runs). |
 | `NotifsPanel.qml` | Right column of the dashboard: MPRIS player card(s) docked on top (`Mpris.players` filtered to non-stopped), notification history ListView, bell "No Notifications" empty state, footer with DND `Toggle` + `Clear`. History is a **ListModel mirrored from `Notifs.history`** (`syncHistory()`, keyed by the entry's stable `entryId`) — a plain-array model would reset the ListView on every change, wiping per-row expanded state and blocking per-item animations. Rows: click = expand/collapse the full wrapped body (grows DOWNWARD only — content is top-anchored; center-anchored made the row grow both ways, the "bouncy" effect); expanded state is a model role (`setProperty`), so removing one row keeps others expanded; ✕ removes with a swipe-out (`ListView.onRemove` + `delayRemove`); new rows slide in from the right; `Clear` resets instantly (no swipe storm). |
 | `Notifs.qml` (singleton) | Notification history (plain JS snapshots, capped 30, newest first), `dnd`, current `toast` entry, `push/remove/clearAll/closeToast`. `push` sets `n.tracked = true` — see notification gotcha. |
 | `Toast.qml` | Top-right toast banner (small mapped-only window, TooltipWindow pattern). Timer mirrors the user's old swaync timings: 2s low / 4s normal / 6s critical; app-supplied `expireTimeout` (ms) wins when > 0, clamped 2–15s. Hidden while DND or the dashboard is open. Click = expand/collapse the full body (timer PAUSES while expanded so it can't vanish mid-read); a small always-visible ✕ in the corner dismisses. Content is top-anchored so expansion grows downward. |
@@ -442,7 +444,73 @@ store` daemon — the daemon and cliphist db are never touched by the shell.
     NOT reset `selIndex` (the poll would yank the selection to the top —
     only the open path resets it).
 
+### System usage section (SystemUsage.qml + ScreenTime.qml, 2026-10-05)
+
+Bottom of the dashboard's calendar column, below the calendar: uptime +
+screen-time row on top, then CPU / Memory / Disk bar rows (order chosen by the
+user — the time row sits ABOVE the usage bars).
+
+- **Quickshell 0.3.1 has NO CPU/RAM/temp/disk API.** `/usr/lib/qt6/qml/Quickshell/Services/`
+  has no System module and no `CpuUsage`/`Memory` types exist in any qmltypes
+  (those landed in later Quickshell). Everything is polled like the OSD's
+  backlight: `FileView` + Timer-driven `reload()` + parse in `onLoaded`
+  (procfs/sysfs emit no inotify events — `watchChanges` is useless there).
+- **Data sources**: CPU = `/proc/stat` aggregate line, usage = 1 − Δidle/Δtotal
+  over the 2s poll (idle = field 4 + iowait field 5, total = first 8 fields;
+  first read after open only calibrates — the OSD `armed` pattern); RAM =
+  `/proc/meminfo` `MemTotal − MemAvailable` ("available", not "free", is what
+  free(1)/htop count; fields are "kB" but really KiB); CPU temp = hwmon probe
+  picks `k10temp|coretemp|zenpower` `temp1_input` (this box: hwmon5 k10temp),
+  fallback `/sys/class/thermal/thermal_zone0/temp` (acpitz, millidegrees);
+  disk = `df -B1 --output=used,size --total -x tmpfs -x devtmpfs -x efivarfs`
+  once per open, parse the TOTAL row (single drive: / + /boot + /home sum);
+  uptime = `/proc/uptime` first float → bootEpoch once per open, formatted per
+  tick. SystemUsage polls ONLY while the dashboard is open (start/stop from
+  DashPopup's `onVisibleChanged`).
+- **ScreenTime** (`IdleMonitor` from `import Quickshell.Wayland`, timeout in
+  SECONDS — property is `double` s, not ms): mirrors the user's hypridle
+  chain (backlight dim 300s < dpms-off 330s < lock 420s < suspend 600s), so
+  isIdle tracks real screen-off almost exactly and suspend counts as off.
+  On isIdle flips: bank the open stretch / reopen it, then persist. 5-min
+  checkpoint Timer covers crash-survival and the midnight rollover (lazy
+  check in every read/write: dayKey ≠ today → reset). An awake stretch
+  spanning midnight counts entirely into the new day (accepted). The sidecar
+  read/write uses a Process (`cat` / `printf > file`) — same reasoning as the
+  clipboard pins (missing-file is normal first-run state; FileView callback
+  timing burned us before).
+- **Singleton laziness gotcha**: a pragma-Singleton component does NOTHING
+  until first accessed. ScreenTime must accumulate all day even if the
+  dashboard is never opened, so shell.qml calls `ScreenTime.init()` in a
+  `Component.onCompleted` on ShellRoot (attached handlers work on ShellRoot;
+  verified). Without that line the accumulator simply never exists.
+- **QtObject roots still can't host children** (hit again while writing
+  ScreenTime as a QtObject singleton: Timer/Process/IdleMonitor children →
+  "Cannot assign to non-existent default property"). Root is an `Item`.
+- **`Process.exec()` exists but the repo convention is `command` + `running
+  = true`** — keep new code on `running = true` (ScreenTime/SystemUsage
+  originally used `.exec()`, converted).
+- **New glyphs** (clock F0150, monitor F0379, cpu F061A, memory F035B, disk
+  F02CA — all md-*): picked by reading the font's own glyph table with
+  fontTools (`TTFont.getBestCmap()` reverse name→codepoint on
+  `/usr/share/fonts/TTF/JetBrainsMonoNerdFontPropo-Regular.ttf`), then
+  render-tested via a throwaway strip window — all clean. md-cpu_64_bit was
+  rejected (embedded "64" text unreadable at 15px).
+- **StatBlock layout** is an inline `component` in SystemUsage.qml (label row
+  + 6px bar, OSD bar visuals verbatim: radius 3, Theme.track / Theme.accent,
+  300ms OutCubic width Behavior). Values pixel-verified: fill/track ratio
+  matched /proc values within 1px for all three bars.
+- **Red herring to remember**: while verifying, the "live" bar instance
+  turned out to be DEAD (no qs process at all, no quickshell layers in
+  `hyprctl layers`) — its log had frozen mid-session, and grepping it for
+  evidence of the singleton led to a long false "ScreenTime doesn't
+  materialize" chase. `pgrep -x qs` / `ps -eo comm | grep qs` FIRST, and
+  `hyprctl layers`, before debugging a "stale" instance. The instance had
+  also stopped hot-reloading before it died (log frozen despite saves) —
+  a fresh `qs -c topbar` picked everything up instantly (also cleared
+  `/run/user/1000/quickshell/vfs/*` first per the stale-cache gotcha).
+
 ### Lock screen (Lockscreen.qml, 2026-10-05)
+
 
 Hyprlock replacement. Runs INSIDE the main shell instance (user decision —
 not a standalone `qs -p` config "for now"): a `WlSessionLock` sits unlocked
