@@ -448,16 +448,39 @@ text over the blur (the soft white MultiEffect glow was tried and
 explicitly rejected as a "weird effect"); legibility is the wallpaper's
 problem. The battery chip was rejected too (kept as a comment in the right
 column). Password dots are 5px; fail feedback is a thin gradient border
-(Canvas — Rectangle borders can't take gradients) that shows ONCE at full
-strength and fades out over 1.8s — NO ring while verifying and NO looping
-animation (user spec). Caps/fail labels are 12px; the fail text says
-"Authentication failed". Readability is solved by SAMPLING: a 16x9 offscreen
+(Canvas — Rectangle borders can't take gradients) in hyprlock's exact
+fail_color (#ff6633→#ff0066, 40deg, alpha .93) that shows ONCE and fades
+out over 1.8s — NO ring while verifying and NO looping animation. The fail
+message lives INSIDE the field (fail_text parity): the buffer is cleared on
+failure so it replaces the dots, and it hides as soon as the user types
+again (effBuffer gate). The displayed failure text is ALWAYS
+"Authentication failed" — pam.message goes to console.warn only (their PAM
+stack's message is literally "wrong password"; the user caught the ternary
+preferring it). Readability is solved by SAMPLING: a 16x9 offscreen
 Canvas (`lumSampler`, loadImage + getImageData) averages the wallpaper's
 luminance and flips `root.wallDark`, which drives `lockFg`/`lockFgMuted` —
-light text on dark wallpapers, dark palette fg on light ones. Caps state:
-single-flight `hyprctl -j devices` probe (1s timer guarded on
-`Process.running`, plus an immediate re-probe on the CapsLock keypress in
-`handleKey`); the capsLock field is only assigned when present.
+light text on dark wallpapers, dark palette fg on light ones (whole-image
+average — a wallpaper split bright-top/dark-bottom classifies by its mean;
+threshold is the `128` in lumSampler). Lock/unlock fades are QML-side
+(`lockFadeInMs`/`lockFadeOutMs`, both 500ms Linear): hyprlock's
+`animation = fadeIn, 1, 5, linear` speed param is DECISECONDS — hyprutils
+`getPercent()` computes `duration = 100 × speed` ms, so 5 = 0.5s, NOT 5s
+(the "5s" reading cost the user a "way too slow" round; they verified by
+setting the knob). The unlock fade MUST run in QML before
+`LockState.engaged` drops, since a layer surface that is already destroyed
+cannot be animated by compositor layer rules; keys are ignored while
+`unlocking`). TWO
+lifecycle traps cost a debug round (user caught it: preview worked, real
+lock stayed palette-dark): (1) in the real bar the content is created with
+`wallpaperPath` ALREADY set, so an `onWallUrlChanged`-only trigger never
+fires — the load must also start from `Component.onCompleted`; (2) a
+Canvas is NOT `available` during construction, so `getContext()` returns
+null ("Unable to use getContext() at this time") — the decode must wait
+for the `available` handshake and be retried (`decodePending` +
+`onAvailableChanged`). Caps state: single-flight `hyprctl -j devices`
+probe (1s timer guarded on `Process.running`, plus an immediate re-probe
+on the CapsLock keypress in `handleKey`); the capsLock field is only
+assigned when present.
 
 - **0.3.1 API names**: `WlSessionLock` / `WlSessionLockSurface` in
   `Quickshell.Wayland` (NOT `SessionLock*` — those are newer). The surface

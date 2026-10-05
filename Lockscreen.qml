@@ -43,6 +43,15 @@ Item {
     //   hyprlock gets (/etc/pam.d/hyprlock is literally "auth include login"),
     //   so no new PAM file is needed. Point it at "quickshell" if you ever
     //   create /etc/pam.d/quickshell with custom rules.
+    // hyprlock parity: "animation = fadeIn, 1, 5, linear" — the speed param
+    // is DECISECONDS (hyprutils getPercent: duration = 100 × speed ms), so
+    // 5 → 500ms with the linear bezier. Set 5000 only if you want it 10×
+    // slower than hyprlock ever was. The fade-out still runs BEFORE the
+    // lock is released (compositor-side layer rules can't animate a surface
+    // that is already destroyed)
+    property int lockFadeInMs: 500
+    property int lockFadeOutMs: 500
+    property bool unlocking: false
     property string profilePhotoPath: Quickshell.env("HOME") + "/Pictures/wallpapers/final_logo.png"
     property string weatherScript: Quickshell.env("HOME") + "/.config/hypr/hyprlock/weather.sh"
 
@@ -137,6 +146,7 @@ Item {
     function engage() {
         if (LockState.engaged) return;
         Popups.close();
+        unlocking = false;
         buffer = "";
         authState = "idle";
         failMessage = "";
@@ -157,8 +167,22 @@ Item {
     }
 
     function unlock() {
-        if (!LockState.engaged) return;
+        if (!LockState.engaged || unlocking) return;
+        // fade the lock content out first; finishUnlock releases the session
+        // once the surface is actually faded (hyprlock fadeOut parity)
+        unlocking = true;
+        unlockFiniTimer.restart();
+    }
+
+    Timer {
+        id: unlockFiniTimer
+        interval: root.lockFadeOutMs
+        onTriggered: root.finishUnlock()
+    }
+
+    function finishUnlock() {
         LockState.engaged = false;
+        unlocking = false;
         buffer = "";
         authState = "idle";
         failMessage = "";
@@ -203,8 +227,10 @@ Item {
             }
             if (result === PamResult.Error) return; // the error signal handled it
             root.authState = "failed";
-            root.failMessage = (pam.messageIsError && pam.message !== "")
-                ? pam.message : "Wrong password";
+            // the failure text is ALWAYS "Authentication failed" — whatever
+            // pam_unix put in .message goes to the log only
+            console.warn("lockscreen: PAM failure message:", pam.message);
+            root.failMessage = "";
             root.buffer = "";
             failResetTimer.restart();
             pam.start(); // re-arm the conversation for the next attempt
@@ -257,6 +283,7 @@ Item {
     }
 
     function handleKey(event) {
+        if (root.unlocking) { event.accepted = true; return; }
         const k = event.key;
         if (k === Qt.Key_CapsLock) {
             event.accepted = true;
@@ -463,10 +490,24 @@ Item {
                 target: c
                 property: "opacity"
                 from: 0; to: 1
-                duration: 280
-                easing.type: Easing.OutCubic
+                duration: root.lockFadeInMs
+                easing.type: Easing.Linear // hyprlock: bezier "linear"
+            }
+            NumberAnimation {
+                id: fadeOutAnim
+                target: c
+                property: "opacity"
+                to: 0
+                duration: root.lockFadeOutMs
+                easing.type: Easing.Linear
             }
             Component.onCompleted: fadeAnim.restart()
+            Connections {
+                target: root
+                function onUnlockingChanged() {
+                    if (root.unlocking) fadeOutAnim.restart();
+                }
+            }
 
             Keys.onPressed: event => root.handleKey(event)
 
@@ -493,7 +534,13 @@ Item {
             }
 
             // samples the wallpaper's average luminance once per load and
-            // flips root.wallDark, which drives lockFg/lockFgMuted above
+            // flips root.wallDark, which drives lockFg/lockFgMuted above.
+            // TWO lifecycle traps (both hit): getContext() needs the canvas
+            // to be `available`, which is false during construction (real
+            // bar: content is created with the path already set → the
+            // sampled decode must wait for availability); and in preview
+            // the path arrives late, so the load must also trigger from
+            // onWallUrlChanged. `decodePending` joins the two async events.
             Canvas {
                 id: lumSampler
                 visible: false
@@ -501,9 +548,23 @@ Item {
                 height: 9
                 readonly property string wallUrl: root.wallpaperPath !== ""
                     ? "file://" + root.wallpaperPath : ""
-                onWallUrlChanged: if (wallUrl !== "") loadImage(wallUrl)
-                onImageLoaded: {
+                property bool decodePending: false
+
+                onWallUrlChanged: {
+                    decodePending = false;
+                    if (wallUrl !== "") loadImage(wallUrl);
+                }
+                Component.onCompleted: {
+                    if (wallUrl !== "") { decodePending = true; loadImage(wallUrl); }
+                }
+                onImageLoaded: sample()
+                onAvailableChanged: if (available && decodePending) sample()
+
+                function sample() {
+                    if (!available) { decodePending = true; return; }
+                    if (wallUrl === "") return;
                     const ctx = getContext("2d");
+                    if (!ctx) { decodePending = true; return; }
                     ctx.clearRect(0, 0, width, height);
                     ctx.drawImage(wallUrl, 0, 0, width, height);
                     const d = ctx.getImageData(0, 0, width, height).data;
@@ -511,6 +572,7 @@ Item {
                     for (let i = 0; i < d.length; i += 4)
                         sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
                     root.wallDark = sum / (d.length / 4) < 128;
+                    decodePending = false;
                 }
             }
 
@@ -518,7 +580,7 @@ Item {
             Item {
                 id: timeBlock
                 anchors.horizontalCenter: parent.horizontalCenter
-                y: Math.round(parent.height * 0.13)
+                y: Math.round(parent.height * 0.10)
                 width: bigTime.width + 10 + apTime.width
                 height: bigTime.height
 
@@ -527,9 +589,9 @@ Item {
                     x: 0
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.timeText
-                    color: root.lockFg
+                    color: root.lockFgMuted
                     font.family: Theme.fontFamily
-                    font.pixelSize: 64
+                    font.pixelSize: 75
                 }
                 Text {
                     id: apTime
@@ -538,19 +600,19 @@ Item {
                     text: root.ampmText
                     color: root.lockFgMuted
                     font.family: Theme.fontFamily
-                    font.pixelSize: 20
+                    font.pixelSize: 75
                 }
             }
             Text {
                 id: dateLabel
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.top: timeBlock.bottom
-                anchors.topMargin: 16
+                anchors.topMargin: 10
                 // date +"%A, %B %d"
                 text: Qt.formatDate(root.now, "dddd, MMMM dd")
                 color: root.lockFgMuted
                 font.family: Theme.fontFamily
-                font.pixelSize: 19
+                font.pixelSize: 22
             }
 
             // ── profile photo [hyprlock "Profile-Photo" block] ────────────
@@ -584,8 +646,7 @@ Item {
             // Canvas because a Rectangle's border cannot take a gradient.
             Canvas {
                 id: fieldRing
-                anchors.centerIn: parent
-                anchors.verticalCenterOffset: 160
+                anchors.centerIn: field // follows the field wherever it sits
                 width: 248
                 height: 58
                 visible: root.effState === "failed"
@@ -593,9 +654,16 @@ Item {
                     const ctx = getContext("2d");
                     ctx.reset();
                     ctx.lineWidth = 2;
-                    const grad = ctx.createLinearGradient(0, 0, 0, height);
-                    grad.addColorStop(0, String(Theme.urgent));
-                    grad.addColorStop(1, String(Theme.danger));
+                    // hyprlock fail_color: rgba(ff6633ee) rgba(ff0066ee) 40deg
+                    const theta = 40 * Math.PI / 180;
+                    const dx = Math.sin(theta), dy = -Math.cos(theta);
+                    const cx = width / 2, cy = height / 2;
+                    const len = Math.abs(width * dx) + Math.abs(height * dy);
+                    const grad = ctx.createLinearGradient(
+                        cx - dx * len / 2, cy - dy * len / 2,
+                        cx + dx * len / 2, cy + dy * len / 2);
+                    grad.addColorStop(0, "rgba(255,102,51,0.93)");
+                    grad.addColorStop(1, "rgba(255,0,102,0.93)");
                     ctx.strokeStyle = grad;
                     const x = 1, y = 1, w = width - 2, h = height - 2, r = 27;
                     ctx.beginPath();
@@ -637,7 +705,7 @@ Item {
             Item {
                 id: field
                 anchors.centerIn: parent
-                anchors.verticalCenterOffset: 160
+                anchors.verticalCenterOffset: 155
                 width: 240
                 height: 50
 
@@ -645,26 +713,27 @@ Item {
                 // indicator (hide_input) — exactly one is visible
                 Row {
                     anchors.centerIn: parent
-                    spacing: 7
+                    spacing: 3
                     visible: !root.hideInput && !root.asteriskDots
 
                     Repeater {
                         model: Math.min(root.effBuffer.length, 12)
                         Rectangle {
                             required property int index
-                            width: 5
-                            height: 5
-                            radius: 2.5
-                            color: root.lockFg
+                            width: 10
+                            height: 10
+                            radius: 5
+                            color: root.lockFgMuted
                             opacity: 0.9
                             // inputFieldDots parity: the newest dot breathes
-                            SequentialAnimation on opacity {
-                                running: index === root.effBuffer.length - 1
-                                loops: Animation.Infinite
-                                alwaysRunToEnd: true
-                                NumberAnimation { to: 0.35; duration: 600 }
-                                NumberAnimation { to: 0.9; duration: 600 }
-                            }
+                            // no need for any kind of breathing animation
+                            // SequentialAnimation on opacity {
+                            //     running: index === root.effBuffer.length - 1
+                            //     loops: Animation.Infinite
+                            //     alwaysRunToEnd: true
+                            //     NumberAnimation { to: 0.35; duration: 600 }
+                            //     NumberAnimation { to: 0.9; duration: 600 }
+                            // }
                         }
                     }
                 }
@@ -684,6 +753,20 @@ Item {
                     iconSize: 18
                     iconColor: root.lockFg
                 }
+
+                // failure message lives INSIDE the field (hyprlock fail_text
+                // parity) — the buffer is cleared on failure so it replaces
+                // the dots, and any new keypress (buffer non-empty) hides it
+                Text {
+                    anchors.centerIn: parent
+                    visible: (root.effState === "failed" || root.effState === "error")
+                             && root.effBuffer === ""
+                    text: (root.effState === "error" && root.failMessage !== "")
+                          ? root.failMessage : "Authentication failed"
+                    color: root.effState === "error" ? Theme.urgent : Theme.danger
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 14
+                }
             }
 
             Text {
@@ -695,19 +778,7 @@ Item {
                 text: "Caps Lock active"
                 color: Theme.urgent
                 font.family: Theme.fontFamily
-                font.pixelSize: 12
-            }
-
-            Text {
-                id: failLabel
-                visible: root.effState === "failed" || root.effState === "error"
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.top: capsLabel.bottom
-                anchors.topMargin: 8
-                text: root.failMessage !== "" ? root.failMessage : "Authentication failed"
-                color: root.effState === "error" ? Theme.urgent : Theme.danger
-                font.family: Theme.fontFamily
-                font.pixelSize: 12
+                font.pixelSize: 14
             }
 
             // ── right column: battery, weather, status ────────────────────
@@ -727,7 +798,7 @@ Item {
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.batt ? Math.round(root.batt.percentage * 100) + "%" : ""
-                    color: root.lockFg
+                    color: root.lockFgMuted
                     font.family: Theme.fontFamily
                     font.pixelSize: 20
                 }
@@ -736,7 +807,7 @@ Item {
                     name: root.battCharging ? "batteryCharging" : "battery"
                     level: root.batt ? root.batt.percentage : 0
                     iconSize: 22
-                    iconColor: root.lockFg
+                    iconColor: root.lockFgMuted
                 }
             }
 
@@ -748,7 +819,7 @@ Item {
                 anchors.rightMargin: 36
                 anchors.topMargin: 20
                 text: root.weatherText
-                color: root.lockFg
+                color: root.lockFgMuted
                 font.family: Theme.fontFamily
                 font.pixelSize: 18
             }
