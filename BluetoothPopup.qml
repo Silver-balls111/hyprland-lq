@@ -160,7 +160,7 @@ RicePopup {
                 required property var modelData
                 required property int index
 
-                width: devList.width
+                width: devList.width - 14
                 height: 40
 
                 Rectangle {

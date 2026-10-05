@@ -72,6 +72,14 @@ requests, and `WifiSecurityType.toString(i)`-style calls reveal enum names.
   through to the shield. Before it existed, clicking a disabled media button
   or any empty area closed the popup (the user caught this). Subclass content
   lands above the swallower, so real controls still get their clicks.
+- **Every scrollable list keeps its delegates ~14px narrower than the
+  ListView** (`width: <list>.width - 14`) so the attached ScrollBar lives in
+  its own lane and never overlays right-edge content (Wi-Fi lock/check
+  icons, power-menu keybind hints, tray-menu submenu arrows, notification
+  hover-✕, clipboard buttons). Applies to WifiPopup, BluetoothPopup,
+  PowerPopup, TrayMenuPopup, NotifsPanel and ClipboardPopup — ANY new
+  scrolling list does the same from day one (ListView/Flickable have no
+  padding properties to lean on).
 - Anchoring data (`wifiRightX` etc. on StatusPill, `anchorX` on Bar) is easy to
   drop during rewrites — a NaN anchorX makes a popup open *invisibly*.
 - Hover-out auto-close was removed on purpose: it fired when the shield mapped

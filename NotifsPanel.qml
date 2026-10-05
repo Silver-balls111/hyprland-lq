@@ -169,7 +169,7 @@ Item {
                 required property var modelData
                 required property int index
 
-                width: notifList.width
+                width: notifList.width - 14
                 height: 48
                 radius: 12
                 color: rowMa.containsMouse ? Theme.rowHover : "transparent"

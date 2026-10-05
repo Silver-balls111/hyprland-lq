@@ -95,7 +95,7 @@ RicePopup {
             required property var modelData
             required property int index
 
-            width: actionList.width
+            width: actionList.width - 14
             height: 40
             radius: 12
             color: rowMa.containsMouse || index === root.selIndex

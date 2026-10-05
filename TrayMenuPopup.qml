@@ -192,7 +192,7 @@ PanelWindow {
                     required property var modelData
                     required property int index
 
-                    width: menuList.width
+                    width: menuList.width - 14
                     height: menuRow.modelData.isSeparator ? 9 : 34
 
                     Rectangle {
