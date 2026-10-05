@@ -378,8 +378,31 @@ store` daemon — the daemon and cliphist db are never touched by the shell.
 - **TextField key handling**: arrows/Tab must be intercepted via
   `Keys.onPressed` (there is no `Keys.onTabPressed` attached handler);
   Left/Right/Home/End stay unintercepted for cursor movement. First Esc
-  clears the search (accepted in the field), second bubbles to the body's
-  `Keys.onEscapePressed` → close.
+  clears the search, second closes — and the FIELD closes explicitly
+  (relying on the event bubbling from the field to the body's
+  `Keys.onEscapePressed` did not work in practice).
+- **Fixes from the first user round — recurring QML traps, do not rediscover**:
+  - Click priority: the row MouseArea must be declared FIRST in the delegate
+    (lowest z) — declared last it sat ON TOP of the button column and
+    swallowed every button click as "restore". Card hover then comes from a
+    passive `HoverHandler`, NOT the MouseArea: a covered MouseArea loses
+    hover, so the hover-only ✕ would vanish the moment the mouse reached it.
+  - `Column`/`Row` layout SKIPS invisible children — a hover-only ✕ toggled
+    with `visible:` resizes every card on hover. Reserve the slot with
+    `opacity` + `enabled` instead.
+  - ListView is a Flickable: it has NO padding properties (`rightPadding` →
+    "Cannot assign to non-existent property"). Clear the attached scrollbar
+    with an explicit delegate width.
+  - Links: `Theme.accent` is unreadable on light palettes (near-white on
+    white insets). Adaptive via a small `lum()` helper in ClipboardPopup:
+    accent only when |lum(accent) − lum(popupBg)| > 0.35, else fg + underline.
+  - Expand-button rule: cliphist marks truncated previews with a trailing
+    `…` — short items get NO expand button; an expanded item shows the
+    shrink glyph (f066) instead of expand (f065). Images always have it.
+  - Live refresh: a 2s Timer re-runs `cliphist list` while the panel is open
+    (parse ~1ms) so new copies appear without reopening; `parseList` must
+    NOT reset `selIndex` (the poll would yank the selection to the top —
+    only the open path resets it).
 
 ### Wallpaper switcher (Wallswitch.qml, 2026-10-04)
 

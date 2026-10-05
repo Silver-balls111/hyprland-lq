@@ -74,6 +74,7 @@ QtObject {
         // clipboard panel
         "search": String.fromCodePoint(0xF002),
         "expand": String.fromCodePoint(0xF065),
+        "shrink": String.fromCodePoint(0xF066),
         "star": String.fromCodePoint(0xF006),
         "starFill": String.fromCodePoint(0xF005),
         "clipboard": String.fromCodePoint(0xF0EA)

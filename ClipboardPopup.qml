@@ -72,6 +72,21 @@ RicePopup {
         return pos >= 0 && pos < shown.length ? shown[pos] : null;
     }
 
+    // links in accent only when the accent is actually readable on the panel
+    // (light palettes often ship a near-white accent), else body color
+    function lum(c) { return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; }
+    readonly property color linkColor:
+        Math.abs(lum(Theme.accent) - lum(Theme.popupBg)) > 0.35 ? Theme.accent : Theme.fg
+
+    // live refresh while open: new copies appear within ~2s. cliphist list
+    // is ~30KB and parsing is ~1ms — nothing.
+    Timer {
+        interval: 2000
+        running: root.visible
+        repeat: true
+        onTriggered: listProc.running = true
+    }
+
     function thumbPath(e) {
         return cacheDir + "/clipboard-" + e.id + "." + (e.ext || "png");
     }
@@ -120,7 +135,8 @@ RicePopup {
             }
         }
         entries = out;
-        selIndex = 0;
+        // NB: no selIndex reset here — the 2s live poll reparses and must not
+        // yank the selection back to the top (open resets it instead)
     }
 
     // ---- pins (sidecar file: one id per line; stale ids are pruned silently) ----
@@ -285,8 +301,8 @@ RicePopup {
                 id: searchField
                 anchors.left: parent.left
                 anchors.leftMargin: 34
-                anchors.right: keyHint.left
-                anchors.rightMargin: 8
+                anchors.right: parent.right
+                anchors.rightMargin: 10
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
                 background: Item {}
@@ -321,21 +337,26 @@ RicePopup {
                     }
                 }
                 Keys.onEscapePressed: event => {
-                    // first Esc clears the search, second closes (bubbles to body)
-                    if (text !== "") { clear(); event.accepted = true; }
+                    // first Esc clears the search, second closes — the field
+                    // closes explicitly: relying on the event bubbling to the
+                    // body's handler proved unreliable in practice
+                    if (text !== "") clear();
+                    else Popups.close();
+                    event.accepted = true;
                 }
             }
 
-            Text {
-                id: keyHint
-                anchors.right: parent.right
-                anchors.rightMargin: 10
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Super V"
-                color: Theme.fgMuted
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.textSize - 2
-            }
+            //not needed
+            // Text {
+            //     id: keyHint
+            //     anchors.right: parent.right
+            //     anchors.rightMargin: 10
+            //     anchors.verticalCenter: parent.verticalCenter
+            //     text: "Super V"
+            //     color: Theme.fgMuted
+            //     font.family: Theme.fontFamily
+            //     font.pixelSize: Theme.textSize - 2
+            // }
         }
 
         // ── filter chips ──
@@ -418,20 +439,36 @@ RicePopup {
                 required property int index
 
                 readonly property var e: modelData
-                readonly property bool hovered: rowMa.containsMouse
+                // NB: HoverHandler, not rowMa.containsMouse — rowMa sits
+                // UNDER the buttons now, and a MouseArea loses hover to
+                // whatever is on top (the ✕ would vanish when the mouse
+                // reached it). HoverHandler is passive and sees everything.
+                readonly property bool hovered: cardHover.hovered
                 readonly property bool selected: index === root.selIndex
                 readonly property bool pinned: root.isPinned(e.id)
                 readonly property bool expanded: e.cat === "image"
                     ? root.bigImages.indexOf(e.id) !== -1
                     : root.expandedText[e.id] !== undefined
 
-                width: cardList.width
+                // 14px narrower than the list: keeps the button column clear
+                // of the vertical scrollbar (Flickable has no padding)
+                width: cardList.width - 14
                 height: cardCol.implicitHeight
 
                 // NB: delegate recycles — request the thumbnail whenever the
                 // entry changes, not just on creation (Component.onCompleted
                 // never re-fires for a reused delegate)
                 onEChanged: if (e.cat === "image") root.requestThumb(e)
+
+                // click-to-restore surface. Declared FIRST = lowest z, so the
+                // button column above receives its own clicks; plain Rectangles
+                // pass clicks through to here.
+                MouseArea {
+                    id: rowMa
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.restore(card.e)
+                }
 
                 Rectangle {
                     anchors.fill: parent
@@ -453,7 +490,9 @@ RicePopup {
                         width: parent.width - buttons.width - parent.spacing
                         height: contentBox.implicitHeight + 16
                         radius: 10
-                        color: Theme.inputBg
+                        // fg-derived tone: stays visible on light AND dark
+                        // palettes (inputBg washed out to near-white here)
+                        color: Theme.track
                         clip: true
 
                         Column {
@@ -474,7 +513,8 @@ RicePopup {
                                 wrapMode: Text.Wrap
                                 maximumLineCount: card.expanded && card.e.cat === "text" ? 9999 : 3
                                 elide: Text.ElideRight
-                                color: card.e.cat === "link" ? Theme.accent : Theme.fg
+                                color: card.e.cat === "link" ? root.linkColor : Theme.fg
+                                font.underline: card.e.cat === "link"
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.textSize
                             }
@@ -520,9 +560,17 @@ RicePopup {
                         Repeater {
                             // NB: hover must NOT live in this model (it would
                             // rebuild all buttons every time the mouse crosses
-                            // a row) — the delete button reads hovered itself
+                            // a row) — the delete button reads hovered itself.
+                            // Expand shows only when there is something beyond
+                            // the preview: images always, text when cliphist
+                            // truncated it (its marker is a trailing "…") or
+                            // when already expanded (= shrink).
                             model: [
-                                { icon: "expand", show: card.e.cat !== "link", act: () => root.toggleExpand(card.e) },
+                                { icon: card.expanded ? "shrink" : "expand",
+                                  show: card.e.cat === "image"
+                                      || (card.e.cat === "text"
+                                          && (card.expanded || /\u2026$|\.\.\.$/.test(card.e.preview))),
+                                  act: () => root.toggleExpand(card.e) },
                                 { icon: card.pinned ? "starFill" : "star", show: true, act: () => root.togglePin(card.e.id) },
                                 { icon: "xmark", show: true, act: () => root.remove(card.e) }
                             ]
@@ -532,12 +580,18 @@ RicePopup {
                                 required property var modelData
                                 required property int index
                                 readonly property bool show: modelData.show
+                                // delete is hover-only, but it must RESERVE its
+                                // slot — visible:false would shrink the column
+                                // (Column layout skips invisible children) and
+                                // resize the card on every hover
+                                readonly property bool deleteSlot: index === 2
 
                                 width: 24
                                 height: 22
                                 radius: 8
-                                // delete is hover-only (matches NotifsPanel's ✕)
-                                visible: show && (index !== 2 || card.hovered)
+                                visible: show
+                                opacity: !deleteSlot || card.hovered ? 1 : 0
+                                enabled: !deleteSlot || card.hovered
                                 color: btnMa.containsMouse ? Theme.accent : "transparent"
 
                                 NIcon {
@@ -556,14 +610,6 @@ RicePopup {
                             }
                         }
                     }
-                }
-
-                MouseArea {
-                    id: rowMa
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.restore(card.e)
                 }
             }
         }
