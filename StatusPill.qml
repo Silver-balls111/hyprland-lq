@@ -233,6 +233,11 @@ Pill {
         TapHandler {
             onTapped: Popups.toggle("wifi")
         }
+        TapHandler {
+            acceptedButtons: Qt.RightButton
+            // right-click: full network management (terminal = hypr $terminal)
+            onTapped: Quickshell.execDetached(["alacritty", "-e", "nmtui"])
+        }
         HoverHandler {
             onHoveredChanged: hovered ? root.tipEnter("wifi", wifiBox) : root.tipLeave(wifiBox)
             cursorShape: Qt.PointingHandCursor
@@ -252,6 +257,11 @@ Pill {
         }
         TapHandler {
             onTapped: Popups.toggle("bt")
+        }
+        TapHandler {
+            acceptedButtons: Qt.RightButton
+            // right-click: full device management
+            onTapped: Quickshell.execDetached(["blueman-manager"])
         }
         HoverHandler {
             onHoveredChanged: hovered ? root.tipEnter("bt", btBox) : root.tipLeave(btBox)
