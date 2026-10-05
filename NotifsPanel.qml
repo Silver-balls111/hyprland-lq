@@ -14,6 +14,68 @@ Item {
     readonly property var activePlayers:
         Mpris.players.values.filter(p => p.playbackState !== MprisPlaybackState.Stopped)
 
+    // ── notification history (scrolls) ──
+    // The panel mirrors Notifs.history into a ListModel so mutations are
+    // INCREMENTAL: a plain-array model resets the ListView on every change,
+    // which rebuilt all delegates — wiping per-row expanded state whenever
+    // any other row was removed — and made per-item animations impossible.
+    // Rows are keyed by the entry's stable `id`; expansion lives as a role.
+    ListModel {
+        id: historyModel
+    }
+    function findRow(id) {
+        for (let r = 0; r < historyModel.count; r++)
+            if (historyModel.get(r).entryId === id) return r;
+        return -1;
+    }
+    function syncHistory() {
+        const want = Notifs.history;
+        // empty history = Clear or the last row ✕-removed: cascade the rows
+        // out one by one (each gets its own swipe) instead of a bare reset
+        // that would skip the animations
+        if (want.length === 0) {
+            if (historyModel.count > 0) cascadeTimer.restart();
+            return;
+        }
+        if (cascadeTimer.running) cascadeTimer.stop();
+        for (let r = historyModel.count - 1; r >= 0; r--) {
+            const rid = historyModel.get(r).entryId;
+            if (want.findIndex(e => e.id === rid) === -1)
+                historyModel.remove(r);
+        }
+        for (let i = want.length - 1; i >= 0; i--) {
+            if (findRow(want[i].id) === -1)
+                historyModel.insert(i, {
+                    entryId: want[i].id,
+                    appName: want[i].appName,
+                    summary: want[i].summary,
+                    body: want[i].body,
+                    urgency: want[i].urgency,
+                    expanded: false
+                });
+        }
+    }
+    // staggered removal for Clear / last-row removal
+    Timer {
+        id: cascadeTimer
+        interval: 14
+        repeat: true
+        onTriggered: {
+            if (Notifs.history.length > 0 || historyModel.count === 0) {
+                cascadeTimer.stop();
+                return;
+            }
+            historyModel.remove(0);
+        }
+    }
+    Connections {
+        target: Notifs
+        function onHistoryChanged() {
+            syncHistory();
+        }
+    }
+    Component.onCompleted: syncHistory()
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 8
@@ -141,7 +203,7 @@ Item {
             }
         }
 
-        // ── notification history (scrolls) ──
+
         ListView {
             id: notifList
             Layout.fillWidth: true
@@ -151,6 +213,22 @@ Item {
             spacing: 2
             boundsBehavior: Flickable.StopAtBounds
             interactive: contentHeight > height
+
+            // new notifications slide in from the right; survivors shift smoothly
+            add: Transition {
+                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 200 }
+                NumberAnimation { property: "x"; from: notifList.width; duration: 220; easing.type: Easing.OutCubic }
+            }
+            // 180ms OutCubic — must match the row height Behavior exactly,
+            // otherwise the displaced row outruns/lags the growing/shrinking
+            // row above and a background-colored gap flashes between them
+            displaced: Transition {
+                NumberAnimation { property: "y"; duration: 180; easing.type: Easing.OutCubic }
+            }
+            removeDisplaced: Transition {
+                NumberAnimation { property: "y"; duration: 180; easing.type: Easing.OutCubic }
+            }
+
             ScrollBar.vertical: ScrollBar {
                 policy: ScrollBar.AsNeeded
                 contentItem: Rectangle {
@@ -162,17 +240,38 @@ Item {
                 background: Item {}
             }
 
-            model: Notifs.history
+            model: historyModel
 
             delegate: Rectangle {
                 id: notifRow
-                required property var modelData
                 required property int index
+                required property int entryId
+                required property string appName
+                required property string summary
+                required property string body
+                required property int urgency
+                required property bool expanded
 
                 width: notifList.width - 14
-                height: 48
+                // expansion grows DOWNWARD only: content is top-anchored, so
+                // the top edge stays put and rows below get pushed down
+                // (center-anchored content made the row grow both ways — the
+                // "bouncy" effect)
+                height: expanded ? contentCol.implicitHeight + 14 : 48
                 radius: 12
                 color: rowMa.containsMouse ? Theme.rowHover : "transparent"
+
+                Behavior on height {
+                    NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                }
+
+                // swipe-out on ✕ removal (Clear resets instantly instead)
+                ListView.onRemove: SequentialAnimation {
+                    PropertyAction { target: notifRow; property: "ListView.delayRemove"; value: true }
+                    NumberAnimation { target: notifRow; property: "x"; to: notifRow.width + 40; duration: 220; easing.type: Easing.InQuad }
+                    NumberAnimation { target: notifRow; property: "opacity"; to: 0; duration: 160 }
+                    PropertyAction { target: notifRow; property: "ListView.delayRemove"; value: false }
+                }
 
                 Rectangle {
                     id: iconChip
@@ -182,7 +281,8 @@ Item {
                     color: Theme.inputBg
                     anchors.left: parent.left
                     anchors.leftMargin: 6
-                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.top: parent.top
+                    anchors.topMargin: 8
 
                     NIcon {
                         anchors.centerIn: parent
@@ -193,34 +293,40 @@ Item {
                 }
 
                 Column {
+                    id: contentCol
                     anchors.left: iconChip.right
                     anchors.leftMargin: 9
                     anchors.right: parent.right
                     anchors.rightMargin: 30
-                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.top: parent.top
+                    anchors.topMargin: 7
                     spacing: 2
 
                     Text {
                         width: parent.width
-                        text: notifRow.modelData.summary !== "" ? notifRow.modelData.summary : notifRow.modelData.appName
+                        text: notifRow.summary !== "" ? notifRow.summary : notifRow.appName
                         elide: Text.ElideRight
-                        color: notifRow.modelData.urgency === 2 ? Theme.danger : Theme.fg
+                        color: notifRow.urgency === 2 ? Theme.danger : Theme.fg
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.textSize
                     }
                     Text {
                         width: parent.width
-                        visible: notifRow.modelData.body !== ""
-                        text: notifRow.modelData.body
-                        elide: Text.ElideRight
+                        visible: notifRow.body !== ""
+                        text: notifRow.body
+                        wrapMode: Text.Wrap
+                        elide: notifRow.expanded ? Text.ElideNone : Text.ElideRight
+                        maximumLineCount: notifRow.expanded ? 1000 : 1
                         color: Theme.fgMuted
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.textSize
                     }
                 }
 
-                // visual-only dismiss affordance — rowMa handles the click
-                // (anywhere on the row removes), so it never flickers on hover
+                // dismiss affordance — hover-revealed; its own MouseArea sits
+                // ABOVE rowMa but with hoverEnabled: false, so it takes the
+                // click while rowMa keeps the hover (the ✕ never flickers
+                // away under the cursor)
                 NIcon {
                     anchors.right: parent.right
                     anchors.rightMargin: 9
@@ -239,6 +345,17 @@ Item {
                     id: rowMa
                     anchors.fill: parent
                     hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: historyModel.setProperty(notifRow.index, "expanded", !notifRow.expanded)
+                }
+
+                MouseArea {
+                    id: xMa
+                    width: 26
+                    height: parent.height
+                    anchors.right: parent.right
+                    anchors.rightMargin: 2
+                    hoverEnabled: false
                     cursorShape: Qt.PointingHandCursor
                     onClicked: Notifs.remove(notifRow.index)
                 }

@@ -2,15 +2,15 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 
-// Transient toast banner for the newest notification — the swaync replacement.
-// Small mapped-only window (TooltipWindow pattern: no input masks on 0.3.1).
-// Timings mirror the user's old swaync config: 2s low / 4s normal / 6s critical;
-// an app-supplied expireTimeout wins when present (clamped 2-15s).
+// Toast stack — every notification shows its own banner at the top-right
+// (newest on top, older ones pushed down), each retiring when its own
+// deadline passes. Small mapped-only window (TooltipWindow pattern: no input
+// masks on 0.3.1). Click a banner to expand/collapse the full body (its
+// deadline freezes while expanded); the corner ✕ dismisses it.
 PanelWindow {
     id: root
 
-    readonly property var entry: Notifs.toast
-    readonly property bool showing: entry !== null && Popups.active !== "clock"
+    readonly property bool showing: Notifs.activeToasts.length > 0 && Popups.active !== "clock"
     visible: showing
 
     anchors {
@@ -22,7 +22,7 @@ PanelWindow {
     exclusionMode: ExclusionMode.Normal
     exclusiveZone: -1
     implicitWidth: 400
-    implicitHeight: Math.max(56, toastCol.implicitHeight + 20)
+    implicitHeight: stackCol.implicitHeight
     margins.right: 10
     // shift down below the OSD while one is showing (same corner)
     margins.top: Theme.barHeight + 8 + (Notifs.osdShowing ? Theme.osdHeight + 8 : 0)
@@ -31,90 +31,124 @@ PanelWindow {
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     WlrLayershell.namespace: "quickshell:toast"
 
+    // expiry ticker (Notifs is a QtObject singleton and cannot host children)
     Timer {
-        id: toastTimer
-        onTriggered: Notifs.closeToast(false)
+        interval: 250
+        running: Notifs.activeToasts.length > 0
+        repeat: true
+        onTriggered: Notifs.expireTick()
     }
 
-    onEntryChanged: {
-        if (entry) {
-            const defaultMs = entry.urgency === 2 ? 6000 : (entry.urgency === 0 ? 2000 : 4000);
-            const ms = entry.expireTimeout > 0
-                ? Math.max(2000, Math.min(15000, entry.expireTimeout))
-                : defaultMs;
-            toastTimer.interval = ms;
-            toastTimer.restart();
-        } else {
-            toastTimer.stop();
-        }
-    }
+    Column {
+        id: stackCol
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.left: parent.left
+        spacing: 8
 
-    Rectangle {
-        anchors.fill: parent
-        radius: 12
-        color: Theme.popupBg
-        border.width: 1
-        border.color: root.entry && root.entry.urgency === 2 ? Theme.danger : Theme.border
+        Repeater {
+            model: Notifs.activeToasts
 
-        Rectangle {
-            id: iconChip
-            width: 36
-            height: 36
-            radius: 8
-            color: Theme.inputBg
-            anchors.left: parent.left
-            anchors.leftMargin: 10
-            anchors.verticalCenter: parent.verticalCenter
+            delegate: Rectangle {
+                id: toastCard
+                required property var modelData
+                readonly property bool urgent: modelData.urgency === 2
 
-            NIcon {
-                anchors.centerIn: parent
-                name: "bell"
-                iconSize: 17
-                iconColor: Theme.fgMuted
+
+                width: stackCol.width
+                height: cardCol.implicitHeight + 20
+                radius: 12
+                color: Theme.popupBg
+                border.width: 1
+                border.color: urgent ? Theme.danger : Theme.border
+
+                Behavior on height {
+                    NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                }
+
+                Rectangle {
+                    id: iconChip
+                    width: 36
+                    height: 36
+                    radius: 8
+                    color: Theme.inputBg
+                    anchors.left: parent.left
+                    anchors.leftMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    NIcon {
+                        anchors.centerIn: parent
+                        name: "bell"
+                        iconSize: 17
+                        iconColor: Theme.fgMuted
+                    }
+                }
+
+                Column {
+                    id: cardCol
+                    anchors.left: iconChip.right
+                    anchors.leftMargin: 10
+                    anchors.right: parent.right
+                    anchors.rightMargin: toastCard.expanded ? 22 : 10
+                    anchors.top: parent.top
+                    anchors.topMargin: 10
+                    spacing: 2
+
+                    Text {
+                        width: parent.width
+                        text: toastCard.modelData.appName
+                        elide: Text.ElideRight
+                        visible: text !== ""
+                        color: Theme.fgMuted
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.textSize
+                    }
+                    Text {
+                        width: parent.width
+                        text: toastCard.modelData.summary !== "" ? toastCard.modelData.summary : toastCard.modelData.appName
+                        elide: Text.ElideRight
+                        color: urgent ? Theme.danger : Theme.fg
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.textSize
+                    }
+                    Text {
+                        width: parent.width
+                        text: toastCard.modelData.body
+                        visible: text !== ""
+                        wrapMode: Text.Wrap
+                        elide: toastCard.expanded ? Text.ElideNone : Text.ElideRight
+                        maximumLineCount: toastCard.expanded ? 1000 : 1
+                        color: Theme.fgMuted
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.textSize
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: Notifs.toggleToastExpanded(toastCard.modelData)
+                }
+
+                // dismiss ✕ — declared AFTER the fullscreen MouseArea so it
+                // sits on top (a covered MouseArea never sees the click)
+                NIcon {
+                    anchors.right: parent.right
+                    anchors.rightMargin: 6
+                    anchors.top: parent.top
+                    anchors.topMargin: 6
+                    name: "xmark"
+                    iconSize: 12
+                    iconColor: Theme.fgMuted
+
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -5
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: Notifs.dismissToast(toastCard.modelData, true)
+                    }
+                }
             }
-        }
-
-        Column {
-            id: toastCol
-            anchors.left: iconChip.right
-            anchors.leftMargin: 10
-            anchors.right: parent.right
-            anchors.rightMargin: 10
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 2
-
-            Text {
-                width: parent.width
-                text: root.entry ? root.entry.appName : ""
-                elide: Text.ElideRight
-                visible: text !== ""
-                color: Theme.fgMuted
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.textSize
-            }
-            Text {
-                width: parent.width
-                text: root.entry ? (root.entry.summary !== "" ? root.entry.summary : root.entry.appName) : ""
-                elide: Text.ElideRight
-                color: root.entry && root.entry.urgency === 2 ? Theme.danger : Theme.fg
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.textSize
-            }
-            Text {
-                width: parent.width
-                text: root.entry ? root.entry.body : ""
-                elide: Text.ElideRight
-                visible: text !== ""
-                color: Theme.fgMuted
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.textSize
-            }
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: Notifs.closeToast(true)
         }
     }
 }
