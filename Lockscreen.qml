@@ -49,7 +49,7 @@ Item {
     // slower than hyprlock ever was. The fade-out still runs BEFORE the
     // lock is released (compositor-side layer rules can't animate a surface
     // that is already destroyed)
-    property int lockFadeInMs: 500
+    property int lockFadeInMs: 600
     property int lockFadeOutMs: 500
     property bool unlocking: false
     property string profilePhotoPath: Quickshell.env("HOME") + "/Pictures/wallpapers/final_logo.png"
@@ -154,7 +154,7 @@ Item {
         pamBroken = false;
         pamRetried = false;
         wallpaperProc.running = true;
-        weatherProc.running = true;
+        // weatherProc.running = true; // weather widget disabled
         if (!testMode && !pam.start()) {
             // Lock anyway (privacy) but tell the user auth is dead; recovery:
             // TTY -> loginctl unlock-session
@@ -401,6 +401,9 @@ Item {
         onTriggered: if (!devicesProbe.running) devicesProbe.running = true
     }
 
+    // weather poll + keyboard-layout switch — DISABLED with their widgets
+    // (uncomment together with the weather/status/kbd blocks below)
+    /*
     Process {
         id: weatherProc
         // weather.sh prints from cache on a hit but NOT on a fresh fetch (it
@@ -426,11 +429,12 @@ Item {
         // Hyprland >= 0.56 where flat dispatches die in the Lua parser
         onExited: (code, status) => { devicesProbe.running = true; }
     }
+    */
 
     Component.onCompleted: {
         devicesProbe.running = true;
         wallpaperProc.running = true;
-        weatherProc.running = true; // the 60s timer alone would miss the first minute
+        // weatherProc.running = true; // weather widget disabled
     }
 
     // ── rounded-corner image helper (mask runs through MultiEffect) ────────
@@ -481,13 +485,12 @@ Item {
             id: c
             anchors.fill: parent
             focus: true
-            opacity: 0
 
             function playFade() { fadeAnim.restart(); }
 
             NumberAnimation {
                 id: fadeAnim
-                target: c
+                target: uiFade
                 property: "opacity"
                 from: 0; to: 1
                 duration: root.lockFadeInMs
@@ -495,7 +498,7 @@ Item {
             }
             NumberAnimation {
                 id: fadeOutAnim
-                target: c
+                target: uiFade
                 property: "opacity"
                 to: 0
                 duration: root.lockFadeOutMs
@@ -575,6 +578,15 @@ Item {
                     decodePending = false;
                 }
             }
+
+            // all UI overlays fade in/out TOGETHER inside this wrapper, while
+            // the wallpaper below stays opaque — fading the whole content
+            // flashed the surface's black backing mid-fade (hyprlock never
+            // dips to black: its wallpaper is opaque from the first frame)
+            Item {
+                id: uiFade
+                anchors.fill: parent
+                opacity: 0
 
             // ── clock + date ──────────────────────────────────────────────
             Item {
@@ -811,6 +823,10 @@ Item {
                 }
             }
 
+            // weather + status widgets — DISABLED by user (battery stays).
+            // Re-enable by uncommenting; weatherText/statusText at the root
+            // stay live either way.
+            /*
             Text {
                 id: weatherLabel
                 visible: root.weatherText !== ""
@@ -835,6 +851,7 @@ Item {
                 font.family: Theme.fontFamily
                 font.pixelSize: 13
             }
+            */
 
             // ── media widget [hyprlock commented media widget] ────────────
             // no card background — it blends into the wallpaper
@@ -932,6 +949,9 @@ Item {
             }
 
             // ── keyboard layout switcher [hyprlock commented $LAYOUT] ─────
+            // DISABLED by user — uncomment to bring back (layoutSwitch
+            // Process at the root is commented out with it)
+            /*
             // plain text (no pill background)
             Item {
                 id: kbdArea
@@ -954,6 +974,7 @@ Item {
                 HoverHandler { id: kbdHover; cursorShape: Qt.PointingHandCursor }
                 TapHandler { onTapped: layoutSwitch.running = true }
             }
+            */
 
             Text {
                 visible: root.testMode
@@ -966,6 +987,7 @@ Item {
                 font.family: Theme.fontFamily
                 font.pixelSize: 12
             }
+            } // uiFade — end of the fading overlay stack
         }
     }
 }

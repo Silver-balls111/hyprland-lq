@@ -474,7 +474,12 @@ threshold is the `128` in lumSampler). Lock/unlock fades are QML-side
 setting the knob). The unlock fade MUST run in QML before
 `LockState.engaged` drops, since a layer surface that is already destroyed
 cannot be animated by compositor layer rules; keys are ignored while
-`unlocking`). TWO
+`unlocking`). The fades target a `uiFade` wrapper around the UI overlays
+ONLY — the wallpaper stays opaque so the surface's black backing never
+shows mid-fade (fading the whole content produced a black flash). Weather,
+status and the keyboard-layout switcher are commented out (user request,
+round 6) — their Processes at the root are commented with them; battery
+stays. TWO
 lifecycle traps cost a debug round (user caught it: preview worked, real
 lock stayed palette-dark): (1) in the real bar the content is created with
 `wallpaperPath` ALREADY set, so an `onWallUrlChanged`-only trigger never
