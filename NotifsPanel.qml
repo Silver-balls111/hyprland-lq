@@ -58,7 +58,7 @@ Item {
     // staggered removal for Clear / last-row removal
     Timer {
         id: cascadeTimer
-        interval: 50
+        interval: 80
         repeat: true
         onTriggered: {
             if (Notifs.history.length > 0 || historyModel.count === 0) {
@@ -214,10 +214,9 @@ Item {
             boundsBehavior: Flickable.StopAtBounds
             interactive: contentHeight > height
 
-            // new notifications slide in from the right; survivors shift smoothly
+            // new notifications fade in IN PLACE (no slide); survivors shift smoothly
             add: Transition {
-                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 200 }
-                NumberAnimation { property: "x"; from: notifList.width; duration: 220; easing.type: Easing.OutCubic }
+                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 250 }
             }
             // 180ms OutCubic — must match the row height Behavior exactly,
             // otherwise the displaced row outruns/lags the growing/shrinking
