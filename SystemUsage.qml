@@ -1,14 +1,18 @@
 import QtQuick
 import Quickshell.Io
 
-// System usage section at the bottom of the dashboard's calendar column:
-// uptime + screen-time row on top, then CPU (+ temp) / memory / total-disk
-// bar rows. Quickshell 0.3.1 has no system-info service, so everything is
-// polled the same way the OSD polls the backlight: FileView.reload() driven
-// by a timer (procfs/sysfs emit no inotify events, so watchChanges is
-// useless). Polling only runs while the dashboard is open — DashPopup calls
-// start()/stop(). Screen time comes from the ScreenTime singleton, which
-// accumulates all day regardless.
+// Profile section at the bottom of the dashboard's calendar column — a
+// fastfetch-style block (reference: user's screenshot): circular avatar left,
+// distro / screen-time / uptime rows right, then the CPU / Memory / Disk bar
+// rows below. No card background — the content blends into the popup like
+// the rest of the dashboard. DashPopup anchors this section below the
+// calendar's worst-case (6-row) footprint and stretches it to the column
+// bottom. Quickshell 0.3.1 has no
+// system-info service, so everything is polled the same way the OSD polls
+// the backlight: FileView.reload() driven by a timer (procfs/sysfs emit no
+// inotify events, so watchChanges is useless). Polling only runs while the
+// dashboard is open — DashPopup calls start()/stop(). Screen time comes from
+// the ScreenTime singleton, which accumulates all day regardless.
 Item {
     id: root
 
@@ -19,8 +23,11 @@ Item {
     property string memText: "" // "9.4 / 15.0 GiB"
     property real diskFraction: 0
     property string diskText: ""
-    property string uptimeText: ""
-    property string screenText: ""
+    property string uptimeText: "" // "up 10 hours, 6 minutes"
+    property string screenText: "" // "2h 14m" (compact — parallels the
+    // short "Hyprland" row of the reference card)
+    property string distroName: ""
+    property string distroGlyphName: "linux"
 
     // CPU delta baseline — the first /proc/stat read after start() only
     // calibrates (same `armed` idea as the OSD's first brightness read)
@@ -32,7 +39,14 @@ Item {
 
     readonly property int pollMs: 2000
 
-    height: col.implicitHeight
+    // ── layout: blended (no card background — sits directly on popupBg like
+    // the rest of the dashboard). DashPopup anchors this section below the
+    // calendar's worst-case (6-row) footprint and stretches it to the column
+    // bottom; leftover height is distributed evenly between the profile block
+    // and the three bar rows.
+    readonly property real profileH: 66
+    readonly property real statH: 28 // label row 18 + 4 + bar 6
+    readonly property real gap: Math.max(10, (height - profileH - 3 * statH) / 3)
 
     function start() {
         prevCpuTotal = -1;
@@ -40,6 +54,7 @@ Item {
         dfProc.running = true;
         if (tempPath === "")
             tempProbe.running = true; // single flight — path never changes while running
+        osView.reload();
         uptimeView.reload();
         statView.reload();
         memView.reload();
@@ -55,11 +70,11 @@ Item {
 
     function tick() {
         if (bootEpoch > 0)
-            uptimeText = fmtDur(Date.now() / 1000 - bootEpoch);
+            uptimeText = "up " + fmtDurLong(Date.now() / 1000 - bootEpoch);
         screenText = fmtDur(ScreenTime.awakeSeconds());
     }
 
-    // "42m" / "3h 24m" / "5d 3h"
+    // compact: "42m" / "3h 24m" / "5d 3h" (screen time row)
     function fmtDur(sec) {
         if (isNaN(sec) || sec < 0) return "—";
         if (sec < 3600) return Math.max(0, Math.floor(sec / 60)) + "m";
@@ -73,6 +88,24 @@ Item {
         return d + "d " + h + "h";
     }
 
+    // verbose, fastfetch-style: "1 hour, 23 minutes" (uptime row; the "up "
+    // prefix is added by tick())
+    function fmtDurLong(sec) {
+        if (isNaN(sec) || sec < 0) return "—";
+        if (sec < 3600) {
+            const m = Math.max(0, Math.floor(sec / 60));
+            return m + (m === 1 ? " minute" : " minutes");
+        }
+        if (sec < 86400) {
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            return h + (h === 1 ? " hour, " : " hours, ") + m + (m === 1 ? " minute" : " minutes");
+        }
+        const d = Math.floor(sec / 86400);
+        const h = Math.floor((sec % 86400) / 3600);
+        return d + (d === 1 ? " day, " : " days, ") + h + (h === 1 ? " hour" : " hours");
+    }
+
     // KiB (the unit /proc/meminfo calls "kB") → "9.4 GiB"
     function fmtGiB(kib) {
         const gib = kib / 1048576;
@@ -80,6 +113,30 @@ Item {
     }
 
     // ── data sources ──
+
+    // distro name for the card row — read from /etc/os-release (NOT
+    // hardcoded) so the rice travels between systems
+    FileView {
+        id: osView
+        path: "/etc/os-release"
+        onLoaded: {
+            let pretty = "", name = "";
+            const lines = text().split("\n");
+            for (let i = 0; i < lines.length; i++) {
+                if (pretty === "" && lines[i].startsWith("PRETTY_NAME="))
+                    pretty = lines[i].slice(12).replace(/^"|"$/g, "");
+                else if (name === "" && lines[i].startsWith("NAME="))
+                    name = lines[i].slice(5).replace(/^"|"$/g, "");
+                if (pretty !== "" && name !== "") break;
+            }
+            const distro = pretty !== "" ? pretty : (name !== "" ? name : "Linux");
+            root.distroName = distro;
+            // glyph match on the lowercased name; Icons has the nerd-font
+            // distro set, "linux" (penguin) is the fallback
+            const lower = distro.toLowerCase();
+            root.distroGlyphName = lower.includes("arch") ? "arch" : "linux";
+        }
+    }
 
     // CPU: aggregate "cpu  user nice system idle iowait irq softirq steal"
     // line; usage = 1 − Δidle/Δtotal between consecutive samples
@@ -201,72 +258,64 @@ Item {
         }
     }
 
-    // ── layout ──
-
     Column {
         id: col
         anchors.left: parent.left
         anchors.right: parent.right
-        spacing: 10
+        anchors.top: parent.top
+        spacing: root.gap
 
-        Rectangle {
-            width: parent.width
-            height: 1
-            color: Theme.divider
-        }
-
-        // uptime + screen time (ScreenTime singleton)
+        // profile: avatar + distro / screen time / uptime rows
         Item {
             width: parent.width
-            height: 18
+            height: root.profileH
 
-            Row {
+            Rectangle {
+                id: pfpFallback
+                width: 56
+                height: 56
+                radius: 28
+                color: Theme.inputBg
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 6
+                visible: pfp.imgStatus !== Image.Ready
                 NIcon {
-                    anchors.verticalCenter: parent.verticalCenter
-                    name: "clock"
-                    iconSize: 15
-                }
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Uptime"
-                    color: Theme.fgMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.textSize
-                }
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: root.uptimeText
-                    color: Theme.fg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.textSize
+                    anchors.centerIn: parent
+                    name: root.distroGlyphName
+                    iconSize: 24
+                    iconColor: Theme.fgMuted
                 }
             }
+            RoundedImage {
+                id: pfp
+                anchors.fill: pfpFallback
+                rounding: 28
+                // repo-relative (resolved against THIS file's dir) — the
+                // rice stays portable; replace assets/pfp.png to change it
+                source: Qt.resolvedUrl("assets/pfp.png")
+            }
 
-            Row {
+            Column {
+                anchors.left: pfpFallback.right
+                anchors.leftMargin: 12
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 6
-                NIcon {
-                    anchors.verticalCenter: parent.verticalCenter
-                    name: "monitor"
-                    iconSize: 15
+                spacing: 5
+
+                InfoRow {
+                    width: parent.width
+                    glyphName: root.distroGlyphName
+                    text: root.distroName === "" ? "Linux" : root.distroName
                 }
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Screen"
-                    color: Theme.fgMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.textSize
-                }
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
+                InfoRow {
+                    width: parent.width
+                    glyphName: "monitor"
                     text: root.screenText
-                    color: Theme.fg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.textSize
+                }
+                InfoRow {
+                    width: parent.width
+                    glyphName: "clock"
+                    text: root.uptimeText
                 }
             }
         }
@@ -297,6 +346,29 @@ Item {
         }
     }
 
+    // glyph + value row of the profile part (labels omitted, like the
+    // reference card — the glyph carries the meaning)
+    component InfoRow: Row {
+        id: ir
+        property string glyphName: ""
+        property string text: ""
+        spacing: 8
+        NIcon {
+            anchors.verticalCenter: parent.verticalCenter
+            name: ir.glyphName
+            iconSize: 15
+            iconColor: Theme.fgMuted
+        }
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: ir.text
+            color: Theme.fg
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.textSize
+            elide: Text.ElideRight
+        }
+    }
+
     // one label row + one slim bar (visual copied from the OSD's bar)
     component StatBlock: Item {
         id: blk
@@ -321,6 +393,7 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         name: blk.iconName
                         iconSize: 15
+                        iconColor: Theme.fgMuted
                     }
                     Text {
                         anchors.verticalCenter: parent.verticalCenter

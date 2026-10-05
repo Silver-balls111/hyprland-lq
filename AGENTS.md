@@ -35,9 +35,10 @@ the config on every file save — you do not need to restart to test QML edits).
 | `WifiPopup.qml` | Wi-Fi toggle, networks sorted by signal (connected first), max 5 visible + scroll, inline password prompt (`connectWithPsk`). |
 | `BluetoothPopup.qml` | Adapter toggle, devices (paired first), pair/connect/disconnect on click. |
 | `PowerPopup.qml` | Power Off / Reboot / Suspend / Log Out / Hibernate / Lock (6 rows, 5 visible + scroll). Commands + letter keybinds mirror `~/.config/wlogout/layout`; grabs exclusive keyboard while open (`grabKeys`). |
-| `DashPopup.qml` | Clock-click dashboard (replaces the old `CalendarPopup`): calendar column (left, 310px) + hairline divider + notifications column (right), fixed `panelHeight` 540 so a playing media card only takes space from the list. `popupName: "clock"`, anchored centered on the clock pill. Below the calendar sits the system-usage section (uptime/screen time + CPU/mem/disk bars) — start()/stop() on open/close. |
-| `CalendarPanel.qml` | Month grid + weekday/date header, extracted verbatim from the old `CalendarPopup`; `resetMonth()` called by DashPopup on every open. Exposes `contentHeight` (its content Column's implicitHeight) — DashPopup sizes the panel to it so the SystemUsage section bottom-anchored under it never overlaps (worst-case 6-week month still leaves ~230px; SystemUsage needs ~145px). |
-| `SystemUsage.qml` | Bottom section of the dashboard's calendar column: uptime + screen-time row, then CPU (% · °C) / Memory / total-Disk bar rows (OSD-style 6px track+accent bars). Quickshell 0.3.1 has NO system-info service — everything is polled from `/proc` + `/sys` + `df` with FileView+Timer (see its section below). |
+| `DashPopup.qml` | Clock-click dashboard (replaces the old `CalendarPopup`): calendar column (left, 310px) + hairline divider + notifications column (right), fixed `panelHeight` 540 so a playing media card only takes space from the list. `popupName: "clock"`, anchored centered on the clock pill. Below the calendar sits the system-usage section (profile rows + CPU/mem/disk bars) — start()/stop() on open/close. |
+| `CalendarPanel.qml` | Month grid + weekday/date header, extracted verbatim from the old `CalendarPopup`; `resetMonth()` called by DashPopup on every open. Exposes `contentHeight` (actual month) and `maxContentHeight` (6-row worst case) — DashPopup sizes the panel to the former and reserves the latter, so the system-usage section below sits at a fixed y in every month. |
+| `SystemUsage.qml` | Profile/system section at the bottom of the dashboard's calendar column: fastfetch-style rows (distro from /etc/os-release, screen time, verbose uptime) next to the circular avatar (assets/pfp.png), then CPU (+ temp) / Memory / total-Disk bar rows. NO card background — blended into the popup. Quickshell 0.3.1 has no system-info service — everything is polled from `/proc` + `/sys` + `df` with FileView+Timer (see its section below). |
+| `RoundedImage.qml` | Rounded-corner image (avatar, lock-screen photo + album art). Originally a MultiEffect mask with an offscreen white item — that NEVER renders in layer-shell windows (see the system-usage section below); rewritten as a Canvas-drawn clip. Same API: `source`, `imgStatus`, `rounding`. |
 | `ScreenTime.qml` (singleton) | Cumulative "screen time today" accumulator (Android-style, resets at midnight). `IdleMonitor` (ext-idle-notify, 330s, inhibitors respected) mirrors the user's hypridle DPMS-off listener; persists to `~/.cache/quickshell_rice/screen-time` (`<yyyy-MM-dd> <seconds>` sidecar). Must run all day even when the dashboard is never opened → singleton, `init()` called from shell.qml `Component.onCompleted` (singletons are lazy — without that first touch NOTHING runs). |
 | `NotifsPanel.qml` | Right column of the dashboard: MPRIS player card(s) docked on top (`Mpris.players` filtered to non-stopped), notification history ListView, bell "No Notifications" empty state, footer with DND `Toggle` + `Clear`. History is a **ListModel mirrored from `Notifs.history`** (`syncHistory()`, keyed by the entry's stable `entryId`) — a plain-array model would reset the ListView on every change, wiping per-row expanded state and blocking per-item animations. Rows: click = expand/collapse the full wrapped body (grows DOWNWARD only — content is top-anchored; center-anchored made the row grow both ways, the "bouncy" effect); expanded state is a model role (`setProperty`), so removing one row keeps others expanded; ✕ removes with a swipe-out (`ListView.onRemove` + `delayRemove`); new rows slide in from the right; `Clear` resets instantly (no swipe storm). |
 | `Notifs.qml` (singleton) | Notification history (plain JS snapshots, capped 30, newest first), `dnd`, current `toast` entry, `push/remove/clearAll/closeToast`. `push` sets `n.tracked = true` — see notification gotcha. |
@@ -446,10 +447,28 @@ store` daemon — the daemon and cliphist db are never touched by the shell.
 
 ### System usage section (SystemUsage.qml + ScreenTime.qml, 2026-10-05)
 
-Bottom of the dashboard's calendar column, below the calendar: uptime +
-screen-time row on top, then CPU / Memory / Disk bar rows (order chosen by the
-user — the time row sits ABOVE the usage bars).
+Bottom of the dashboard's calendar column, below the calendar. Layout per
+user round 2: **no card background** — the profile rows and the CPU / Memory /
+Disk bars blend directly into the popup (they looked "packed together" with a
+bg). The section is anchored below the calendar's **worst-case (6-row)
+footprint** (`CalendarPanel.maxContentHeight`) and stretched to the column
+bottom, so it never moves while browsing 4/5/6-row months and never
+overflows; leftover height is distributed evenly between the profile block
+and the bar rows (`gap = (height − 66 − 3×28) / 3`, min 10).
 
+- **Profile rows are fastfetch-style** (user's reference screenshot): a
+  circular avatar (`assets/pfp.png`, Canvas-masked) + three value-only rows —
+  distro, screen time, `up X hours, Y minutes`. The user explicitly dropped
+  the "Hyprland" row ("no need for generic hyprland in there, screen time is
+  fine") and asked for the verbose uptime format. Screen time stays compact
+  (`2h 14m`) to parallel the reference's short middle row.
+- **Rice portability**: the avatar is repo-relative
+  (`Qt.resolvedUrl("assets/pfp.png")` — anchors to the QML file's own dir, no
+  `~/Pictures` dependency; replace the file to change it — placeholder is a
+  magick-generated silhouette). The lock screen's `profilePhotoPath` points
+  at the SAME asset (was `~/Pictures/wallpapers/final_logo.png`, which never
+  existed). The distro row is parsed from `/etc/os-release` (PRETTY_NAME,
+  fallback NAME, fallback "Linux") — never hardcode "Arch Linux".
 - **Quickshell 0.3.1 has NO CPU/RAM/temp/disk API.** `/usr/lib/qt6/qml/Quickshell/Services/`
   has no System module and no `CpuUsage`/`Memory` types exist in any qmltypes
   (those landed in later Quickshell). Everything is polled like the OSD's
@@ -467,6 +486,20 @@ user — the time row sits ABOVE the usage bars).
   uptime = `/proc/uptime` first float → bootEpoch once per open, formatted per
   tick. SystemUsage polls ONLY while the dashboard is open (start/stop from
   DashPopup's `onVisibleChanged`).
+- **MultiEffect maskSource is BROKEN in layer-shell windows** — the big one
+  from this round. `MultiEffect { maskEnabled: true; maskSource: someItem }`
+  renders NOTHING (mask-off renders fine) in the dashboard popup AND probe
+  windows, with the mask item BOTH offscreen (the lock screen's x:-3000
+  pattern) AND on-screen. Probes: plain Image ✓, MultiEffect without mask ✓,
+  with mask ✗ — the mask texture simply never samples. The lock screen never
+  caught it because its two RoundedImage usages never had a loadable image
+  (photo path 404, media card commented out). `RoundedImage.qml` is therefore
+  a **Canvas-drawn clip** now: hidden Image feeds `imgStatus` + natural size
+  via the `sourceSize` READ-BACK (works — verified 256x256), Canvas draws the
+  rounded-rect path (`arcTo`) + cover-crop `drawImage` with the URL registered
+  through `canvas.loadImage()` (repeat per source change + on paint). Canvas
+  is software-rasterized — works in every window type, inside `clip: true`,
+  everywhere. Don't go back to maskSource for anything in this repo.
 - **ScreenTime** (`IdleMonitor` from `import Quickshell.Wayland`, timeout in
   SECONDS — property is `double` s, not ms): mirrors the user's hypridle
   chain (backlight dim 300s < dpms-off 330s < lock 420s < suspend 600s), so
@@ -489,16 +522,20 @@ user — the time row sits ABOVE the usage bars).
 - **`Process.exec()` exists but the repo convention is `command` + `running
   = true`** — keep new code on `running = true` (ScreenTime/SystemUsage
   originally used `.exec()`, converted).
-- **New glyphs** (clock F0150, monitor F0379, cpu F061A, memory F035B, disk
-  F02CA — all md-*): picked by reading the font's own glyph table with
-  fontTools (`TTFont.getBestCmap()` reverse name→codepoint on
+- **Glyphs** (clock F0150, monitor F0379, cpu F061A, memory F035B, disk
+  F02CA, arch F303, linux F033D): picked by reading the font's own glyph
+  table with fontTools (`TTFont.getBestCmap()` reverse name→codepoint on
   `/usr/share/fonts/TTF/JetBrainsMonoNerdFontPropo-Regular.ttf`), then
-  render-tested via a throwaway strip window — all clean. md-cpu_64_bit was
+  render-tested via a throwaway strip window. The distro glyph maps
+  os-release's name → `arch`, else the penguin `linux`. md-cpu_64_bit was
   rejected (embedded "64" text unreadable at 15px).
-- **StatBlock layout** is an inline `component` in SystemUsage.qml (label row
-  + 6px bar, OSD bar visuals verbatim: radius 3, Theme.track / Theme.accent,
-  300ms OutCubic width Behavior). Values pixel-verified: fill/track ratio
-  matched /proc values within 1px for all three bars.
+- **Two live-bar traps while verifying**: (1) an intermediate reload between
+  two edits of the SAME feature logs errors forever after (e.g.
+  `ReferenceError: dateHeader is not defined` from a binding whose target id
+  landed in the next save) — count occurrences before/after a forced reload
+  before treating it as real; the final files were clean. (2) When the bar
+  process is dead, its log keeps existing and greps "succeed" — check
+  `pgrep -x qs` / `hyprctl layers` FIRST (see below).
 - **Red herring to remember**: while verifying, the "live" bar instance
   turned out to be DEAD (no qs process at all, no quickshell layers in
   `hyprctl layers`) — its log had frozen mid-session, and grepping it for

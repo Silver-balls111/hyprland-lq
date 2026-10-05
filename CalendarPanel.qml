@@ -29,6 +29,12 @@ Item {
     // never overlaps
     readonly property real contentHeight: col.implicitHeight
 
+    // worst-case content height (6 grid rows). DashPopup reserves this much
+    // below the header stack for the calendar so the profile/system section
+    // sits at a FIXED y — browsing to a 4- or 5-row month never shifts it
+    // (literals mirror the layout below: nav 28, weekday row 20, cells 32)
+    readonly property real maxContentHeight: dateHeader.implicitHeight + 3 * col.spacing + 28 + 20 + 6 * 32
+
     function isToday(d) {
         return root.clock && d.getFullYear() === root.clock.date.getFullYear()
             && d.getMonth() === root.clock.date.getMonth() && d.getDate() === root.clock.date.getDate();
@@ -42,6 +48,7 @@ Item {
         spacing: 7
 
         Text {
+            id: dateHeader
             anchors.horizontalCenter: parent.horizontalCenter
             text: root.clock ? Qt.formatDateTime(root.clock.date, "dddd, d MMMM yyyy") : ""
             color: Theme.fgMuted

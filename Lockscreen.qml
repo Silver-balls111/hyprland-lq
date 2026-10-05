@@ -52,7 +52,10 @@ Item {
     property int lockFadeInMs: 600
     property int lockFadeOutMs: 500
     property bool unlocking: false
-    property string profilePhotoPath: Quickshell.env("HOME") + "/Pictures/wallpapers/final_logo.png"
+    // repo-relative (Qt.resolvedUrl anchors it to THIS file's location) so the
+    // rice is portable — no ~/Pictures dependency; drop any square-ish image
+    // at <repo>/assets/pfp.png to replace the placeholder
+    property string profilePhotoPath: Qt.resolvedUrl("assets/pfp.png")
     property string weatherScript: Quickshell.env("HOME") + "/.config/hypr/hyprlock/weather.sh"
 
     // ── test/preview overrides (throwaway instances set these) ────────────
@@ -435,43 +438,6 @@ Item {
         devicesProbe.running = true;
         wallpaperProc.running = true;
         // weatherProc.running = true; // weather widget disabled
-    }
-
-    // ── rounded-corner image helper (mask runs through MultiEffect) ────────
-    component RoundedImage: Item {
-        id: ri
-        property alias source: img.source
-        property alias imgStatus: img.status
-        property real rounding: 0
-        Image {
-            id: img
-            visible: false // rendered only through the mask MultiEffect
-            anchors.fill: parent
-            fillMode: Image.PreserveAspectCrop
-            asynchronous: true
-            cache: true
-        }
-        MultiEffect {
-            anchors.fill: parent
-            source: img
-            maskEnabled: true
-            maskSource: maskItem
-            maskThresholdMin: 0.5
-            maskSpreadAtMin: 1.0
-        }
-        // kept offscreen: it must render (mask texture) but never paint in view
-        Item {
-            id: maskItem
-            x: -3000
-            y: -3000
-            width: ri.width
-            height: ri.height
-            Rectangle {
-                anchors.fill: parent
-                radius: ri.rounding
-                color: "white"
-            }
-        }
     }
 
     // NOTE: no text shadows/glows anywhere — the user rejected the soft

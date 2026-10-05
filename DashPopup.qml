@@ -47,10 +47,15 @@ RicePopup {
                 clock: root.clock
             }
 
+            // profile/system section: pinned below the calendar's WORST-CASE
+            // footprint (6 grid rows) and stretched to the column bottom, so
+            // its position is stable while browsing 4/5/6-row months
             SystemUsage {
                 id: sysUsage
                 anchors.left: parent.left
                 anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.topMargin: calPanel.maxContentHeight + 12
                 anchors.bottom: parent.bottom
             }
         }

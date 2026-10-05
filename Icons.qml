@@ -84,6 +84,10 @@ QtObject {
         "monitor": String.fromCodePoint(0xF0379),
         "cpu": String.fromCodePoint(0xF061A),
         "memory": String.fromCodePoint(0xF035B),
-        "disk": String.fromCodePoint(0xF02CA)
+        "disk": String.fromCodePoint(0xF02CA),
+        // distro row of the dashboard profile card (matched against
+        // /etc/os-release's NAME, "linux" is the fallback)
+        "arch": String.fromCodePoint(0xF303),
+        "linux": String.fromCodePoint(0xF033D)
     }
 }
