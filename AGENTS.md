@@ -337,10 +337,14 @@ most of a session before being identified.
 Rofi clipboard picker replacement on the existing `wl-paste --watch cliphist
 store` daemon — the daemon and cliphist db are never touched by the shell.
 
-- **Trigger**: `GlobalShortcut` appid `qs-bar`, name `clipboard` →
-  `Popups.toggle("clip")`; instantiated in `Bar.qml` with
-  `anchorX: bar.width / 2` (that line + `centerOnAnchor` are the position
-  knobs; panel size knobs sit at the top of ClipboardPopup.qml).
+- **Trigger**: `GlobalShortcut` appid `qs`, name `clipboard` →
+  `Popups.toggle("clip")` (own appid — like the wallpaper picker, it's a
+  standalone desktop tool, not a bar feature; the user's bind is
+  `hl.bind(mainMod .. " + V", hl.dsp.global("qs:clipboard"))`). The panel is
+  instantiated at shell root (NOT in Bar.qml) and centers itself on the
+  screen: `anchorX: screen.width/2` + `centerOnAnchor` +
+  `centerVertically` (a RicePopup option added for it). Size knobs: `panelW`
+  / `panelH` at the top of ClipboardPopup.qml.
 - **Data**: one `cliphist list` per open. Lines are `id\tpreview`
   (tab-separated); multi-line continuations don't match `^\d+\t` and are
   skipped. Categories: image when the preview starts with `[[ binary data `
@@ -361,7 +365,12 @@ store` daemon — the daemon and cliphist db are never touched by the shell.
   line, written via a Process. Read it with a Process too (`cat`, missing
   file = empty output) — the FileView failed-load callback timing once
   silently reverted a pin race-style; the Process read is deterministic.
-  Pinned ids sort first via a stable sort. Pruned ids vanish silently.
+  Pinned ids sort first via a stable sort. Pruned ids vanish silently. The
+  panel order otherwise IS `cliphist list`'s own order (newest copy first —
+  verified: restoring an old entry re-stores it as a NEW id at the top of
+  the list; a 2s poll surfaces it; a pinned card legitimately sits above).
+  Restoring also leaves the old entry behind as a duplicate in cliphist —
+  same artifact the rofi flow had, not worth solving.
 - **Buttons are mouse-only by design**: ⤢/☆/✕ are plain MouseAreas — never
   focused, not in the tab order, no keybinds. Keyboard exists solely to
   iterate cards (fast list walking): Tab/Backtab/Up/Down move, Enter

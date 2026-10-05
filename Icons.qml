@@ -71,10 +71,10 @@ QtObject {
         // "forward" f04e is the ▶▶ pair-mate of "prev" f049's ◀◀
         "prev": String.fromCodePoint(0xF049),
         "next": String.fromCodePoint(0xF04E),
-        // clipboard panel
+        // clipboard panel — md arrow expand/collapse (user-picked glyphs)
         "search": String.fromCodePoint(0xF002),
-        "expand": String.fromCodePoint(0xF065),
-        "shrink": String.fromCodePoint(0xF066),
+        "expand": String.fromCodePoint(0xF0616),
+        "shrink": String.fromCodePoint(0xF0615),
         "star": String.fromCodePoint(0xF006),
         "starFill": String.fromCodePoint(0xF005),
         "clipboard": String.fromCodePoint(0xF0EA)

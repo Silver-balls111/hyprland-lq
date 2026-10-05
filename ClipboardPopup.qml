@@ -15,14 +15,18 @@ RicePopup {
 
     popupName: "clip"
     keyNavEnabled: true
-    centerOnAnchor: true
 
     // ---- tweak me ----
     property int panelW: 640      // -> panelWidth
-    property int panelH: 660      // -> panelHeight (clamped to the screen)
-    // (the position knob is the anchorX line on the instance in Bar.qml)
+    property int panelH: 600      // -> panelHeight (clamped to the screen)
     panelWidth: panelW
     panelHeight: panelH
+    // position knobs: horizontal center via anchorX + centerOnAnchor, vertical
+    // center via centerVertically (RicePopup) — all three live on instances;
+    // defaults below center the panel on the screen
+    centerOnAnchor: true
+    centerVertically: true
+    anchorX: screen ? Math.round(screen.width / 2) : 0
 
     // ---- state ----
     property var entries: []            // {id, raw, preview, cat, ext?, w?, h?}
@@ -450,6 +454,8 @@ RicePopup {
                     ? root.bigImages.indexOf(e.id) !== -1
                     : root.expandedText[e.id] !== undefined
 
+                HoverHandler { id: cardHover }
+
                 // 14px narrower than the list: keeps the button column clear
                 // of the vertical scrollbar (Flickable has no padding)
                 width: cardList.width - 14
@@ -486,7 +492,10 @@ RicePopup {
                     spacing: 6
 
                     // ── inset content box ──
+                    // vertically centered: the button column is taller than
+                    // collapsed cards, and top-aligning left dead space below
                     Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
                         width: parent.width - buttons.width - parent.spacing
                         height: contentBox.implicitHeight + 16
                         radius: 10

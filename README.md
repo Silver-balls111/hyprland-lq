@@ -54,7 +54,7 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
    hl.bind(mainMod .. " + X", hl.dsp.global("qs-bar:powermenu"))          -- power popup
    hl.bind(mainMod .. " + N", hl.dsp.global("qs-bar:notification"))       -- dashboard
    hl.bind(mainMod .. " + W", hl.dsp.global("qs:wallpaper-switcher"))     -- wallpaper picker
-   hl.bind(mainMod .. " + V", hl.dsp.global("qs-bar:clipboard"))          -- clipboard panel
+   hl.bind(mainMod .. " + V", hl.dsp.global("qs:clipboard"))              -- clipboard panel
    ```
    The OSD watches real device state, so volume/brightness keys need no helper
    scripts — call the tools directly (scripts from a swaync setup are fully

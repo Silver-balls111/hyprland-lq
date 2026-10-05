@@ -38,10 +38,11 @@ ShellRoot {
     }
 
     // mainMod+V — clipboard history panel (cliphist backend, rofi picker
-    // replacement). The user binds it in their Lua config:
-    // hl.bind("SUPER + V", hl.dsp.global("qs-bar:clipboard"))
+    // replacement). Standalone fullscreen panel (not a bar feature — its own
+    // appid), centered on screen by the instance itself. Bind line:
+    // hl.bind("SUPER + V", hl.dsp.global("qs:clipboard"))
     GlobalShortcut {
-        appid: "qs-bar"
+        appid: "qs"
         name: "clipboard"
         description: "Toggle the clipboard history panel"
         onPressed: Popups.toggle("clip")
@@ -101,4 +102,7 @@ ShellRoot {
     // AFTER the bar so its (invisible) input shield stacks above the bar,
     // same as the other popups: clicking a pill closes the picker first.
     Wallswitch {}
+
+    // clipboard history panel (standalone, screen-centered, not a bar feature)
+    ClipboardPopup {}
 }
