@@ -72,10 +72,6 @@ PanelWindow {
                 border.width: 1
                 border.color: urgent ? Theme.danger : Theme.border
 
-                Behavior on height {
-                    NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-                }
-
                 Rectangle {
                     id: iconChip
                     width: 36

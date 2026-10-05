@@ -58,7 +58,7 @@ Item {
     // staggered removal for Clear / last-row removal
     Timer {
         id: cascadeTimer
-        interval: 30
+        interval: 50
         repeat: true
         onTriggered: {
             if (Notifs.history.length > 0 || historyModel.count === 0) {
@@ -265,13 +265,18 @@ Item {
                     NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
                 }
 
-                // swipe-out on ✕ removal (Clear resets instantly instead)
-                ListView.onRemove: SequentialAnimation {
+                // swipe-out on ✕ removal (Clear cascades instead of resetting)
+                // NB: the animation is a declared object driven from the signal
+                // handler — assigning the object DIRECTLY to onRemove is the
+                // deprecated "object to signal handler" pattern Qt warns about
+                SequentialAnimation {
+                    id: removeAnim
                     PropertyAction { target: notifRow; property: "ListView.delayRemove"; value: true }
-                    NumberAnimation { target: notifRow; property: "x"; to: notifRow.width + 40; duration: 220; easing.type: Easing.InQuad }
-                    NumberAnimation { target: notifRow; property: "opacity"; to: 0; duration: 160 }
+                    NumberAnimation { target: notifRow; property: "x"; to: notifRow.width + 40; duration: 240; easing.type: Easing.InQuad }
+                    NumberAnimation { target: notifRow; property: "opacity"; to: 0; duration: 180 }
                     PropertyAction { target: notifRow; property: "ListView.delayRemove"; value: false }
                 }
+                ListView.onRemove: removeAnim.start()
 
                 Rectangle {
                     id: iconChip

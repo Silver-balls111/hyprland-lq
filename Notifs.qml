@@ -113,7 +113,8 @@ QtObject {
                 if (byUser) entry.notif.dismiss();
                 else entry.notif.expire();
             } catch (err) {
-                console.warn("dismissToast: notif wrapper already gone:", err);
+                // expected: quickshell retires the server-side notification at
+                // its own expireTimeout, so the ticker can race a dead wrapper
             }
             entry.notif = null;
         }
