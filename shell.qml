@@ -105,4 +105,9 @@ ShellRoot {
 
     // clipboard history panel (standalone, screen-centered, not a bar feature)
     ClipboardPopup {}
+
+    // session lock screen (hyprlock replacement). Inert until something sets
+    // LockState.engaged (qs-bar:lock shortcut / hypridle via `hyprctl eval`
+    // / PowerPopup). GlobalShortcut + PAM live inside the component.
+    Lockscreen {}
 }

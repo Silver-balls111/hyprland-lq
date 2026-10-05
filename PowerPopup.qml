@@ -45,16 +45,20 @@ RicePopup {
         case Qt.Key_Return:
         case Qt.Key_Enter:
         case Qt.Key_Space:
-            if (actionList.count > 0) root.run(actionList.model[selIndex].cmd);
+            if (actionList.count > 0) root.run(actionList.model[selIndex]);
             return;
         }
         const entry = actionList.model.find(m => m.key === event.text.toLowerCase());
-        if (entry) root.run(entry.cmd);
+        if (entry) root.run(entry);
     }
 
-    function run(cmd) {
+    // entries either carry a cmd (execDetached) or act: "lock" (engages the
+    // in-shell Lockscreen via LockState — PAM flow verified against
+    // /etc/pam.d/login, the same stack hyprlock uses)
+    function run(entry) {
         Popups.close();
-        Quickshell.execDetached(cmd);
+        if (entry.act === "lock") { LockState.engaged = true; return; }
+        Quickshell.execDetached(entry.cmd);
     }
 
     ListView {
@@ -87,7 +91,7 @@ RicePopup {
             { icon: "suspend", label: "Suspend", key: "u", cmd: ["systemctl", "suspend"] },
             { icon: "logout", label: "Log Out", key: "l", cmd: ["hyprshutdown"] },
             { icon: "hibernate", label: "Hibernate", key: "h", cmd: ["systemctl", "hibernate"] },
-            { icon: "lock", label: "Lock", key: "o", cmd: ["/bin/sh", "-c", "$HOME/.config/hypr/hyprlock/hyprlock-auto.sh"] }
+            { icon: "lock", label: "Lock", key: "o", act: "lock" }
         ]
 
         delegate: Rectangle {
@@ -124,7 +128,7 @@ RicePopup {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: root.run(actionRow.modelData.cmd)
+                onClicked: root.run(actionRow.modelData)
             }
         }
     }

@@ -55,6 +55,7 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
    hl.bind(mainMod .. " + N", hl.dsp.global("qs-bar:notification"))       -- dashboard
    hl.bind(mainMod .. " + W", hl.dsp.global("qs:wallpaper-switcher"))     -- wallpaper picker
    hl.bind(mainMod .. " + V", hl.dsp.global("qs:clipboard"))              -- clipboard panel
+   hl.bind("SUPER + L", hl.dsp.global("qs-bar:lock"))                     -- lock screen
    ```
    The OSD watches real device state, so volume/brightness keys need no helper
    scripts — call the tools directly (scripts from a swaync setup are fully
@@ -112,6 +113,25 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
    `~/.config/dbus-1/services/org.gnome.Shell.Notifications.service` with
    `Exec=/bin/false`).
 
+7. **Lock screen** (hyprlock replacement) — blurred current wallpaper, 12h
+   clock + date, PAM password field, battery/weather/status and a media card.
+   It runs inside the bar instance and engages through the `qs-bar:lock`
+   shortcut (bind shown in step 3; the power menu's Lock action engages it
+   too). Auth uses `/etc/pam.d/login` — the same PAM stack hyprlock's config
+   includes — so no new PAM file is needed. For hypridle, scripts can't use
+   `hyprctl dispatch global` (Lua parser), but the eval socket works — in
+   `~/.config/hypr/hypridle.conf`:
+   ```ini
+   lock_cmd = hyprctl eval 'hl.dsp.global("qs-bar:lock")'
+   ```
+   (`loginctl lock-session` → hypridle → that command; re-fires are no-ops.)
+   If the password is ever rejected with PAM broken: switch to a TTY
+   (Ctrl+Alt+F2) and run `loginctl unlock-session`. To preview without
+   locking, run a throwaway instance that sets `testMode: true` (see
+   AGENTS.md "Lock screen"); the widgets you don't want are self-contained
+   blocks at the bottom of `Lockscreen.qml` — comment them out like you did
+   in hyprlock.conf.
+
 ## Features
 
 | Element | Behavior |
@@ -127,6 +147,7 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
 | Bluetooth | Click opens a **dropdown**: toggle adapter, up to 5 devices visible with scroll (paired first), click to pair / connect / disconnect. Icon reflects adapter state; hover tooltip lists connected devices. Keyboard: same as Wi-Fi. |
 | Battery | UPower percentage + state icon (charging/discharging sets, same glyphs as the waybar config); hover tooltip shows time remaining. |
 | Power | Click opens **Lock / Log Out / Reboot / Power Off**. Keyboard: `Tab`/arrows or the wlogout letters (`s`/`r`/`u`/`l`/`h`/`o`), `Enter` runs the action, `Esc` closes. |
+| Lock screen | The `SUPER+L` bind, hypridle, or the power menu locks the session behind a blurred current wallpaper: big 12h clock + date, invisible password field with breathing dots (typed chars only — `Esc`/`Ctrl+U`/`Ctrl+Backspace` clear, `Enter` submits to PAM), a red "wrong password" state with the PAM message, a "Caps Lock active" warning, battery (with chip), weather, a vol/mic/bt status line, a clickable keyboard-layout switcher, and an MPRIS media card while something plays. Unlocks only on a correct password; no fingerprint (Quickshell PAM is password-only). |
 | Wallpaper picker | `SUPER+W` opens a **skwd-wall-style picker** floating over the live desktop: four right-leaning slanted slices per side of a fixed 16:9 center frame, the selected wallpaper enlarged behind an accent border (starts on the current wallpaper; only the focused one shows its filename chip). Scroll / arrow keys / click a slice to preview it centered; click the centered one or press `Enter`/`Space` to apply — `awww` with a random transition, then `matugen` regenerates the whole palette live (requires `[config.wallpaper] set = false` in matugen's config so it never re-applies the image itself). **Type to search**: printable keys filter the set live with a `query · matches` chip above the row, `Backspace` edits, `Esc` clears the search first. `Esc` (with empty search) or clicking bare desktop closes. An optional `dimaround` layer rule (see setup step 4) dims the desktop behind it. Replaces the old rofi `wall-switcher.sh` flow. |
 | Clipboard history | `SUPER+V` opens a **cliphist-backed panel** (replaces the rofi clipboard picker; your `wl-paste --watch cliphist store` daemon stays as-is): a search field, All/Text/Image/Link chips with live counts, and compact preview cards. Click a card (or `Enter` on the selected one) to paste it back; cards show 3 lines of text, tinted links, or image thumbnails (decoded once, cached under `~/.cache/quickshell_rice/`). Per-card buttons: expand text to full content / images to true aspect, pin (pinned cards sort first, `☆`→`★`), hover-`✕` deletes from cliphist. Keyboard-first: arrows/`Tab` iterate cards, typing searches, `Esc` clears the search first. |
 
@@ -158,6 +179,8 @@ clicking a bar pill toggles it directly. Clicks inside a panel never close it.
 | `RicePopup.qml` | Shared popup shell: anchoring/clamping, panel sizes, close behavior, click swallowing |
 | `WifiPopup.qml` / `BluetoothPopup.qml` | Per-popup list behavior, password prompt |
 | `PowerPopup.qml` | Power actions + commands |
+| `Lockscreen.qml` | Lock-screen widgets/geometry, knobs (`hideInput`, `asteriskDots`, `pamConfig`, `profilePhotoPath`), test overrides; comment out feature blocks here |
+| `LockState.qml` | The lock switch PowerPopup (or anything) sets to engage the lock |
 | `Popups.qml` | Which popup is open (exclusivity), outside-click toggle guard |
 | `TooltipWindow.qml` / `TrayMenuPopup.qml` | Tooltip rendering / tray menu theming |
 | `NIcon.qml` / `Toggle.qml` / `SignalBars.qml` / `Pill.qml` | Primitives: icon sizing, switches, signal bars, pill shape |

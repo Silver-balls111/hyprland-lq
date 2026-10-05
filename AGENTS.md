@@ -30,6 +30,8 @@ the config on every file save — you do not need to restart to test QML edits).
 | `Popups.qml` (singleton) | `active` = name of the open popup ("" / "clock" / "wifi" / "bt" / "power" / "tray" / "wall"). Single source of truth for popup exclusivity. `lastDismiss` guards against the outside-click that dismissed a popup re-triggering a toggle. |
 | `RicePopup.qml` | Base class for dash/wifi/bt/power popups: full-screen transparent layer-shell "shield", visible rounded panel anchored inside it, closes on outside click / `Esc` / `Popups.active` change. `panelWidth` + optional `panelHeight` (0 = auto-size from content); panel x is clamped to the screen. |
 | `ClipboardPopup.qml` | Clipboard history panel (cliphist backend, rofi picker replacement): search + category chips, preview cards, decode-on-demand thumbnails, pin sidecar. See its section below. |
+| `Lockscreen.qml` | Session lock (hyprlock replacement): blurred awww wallpaper, 12h clock + date, PAM password dots, battery chip + weather + status (right column), MPRIS media card, keyboard-layout switcher. Lives in the main shell instance; engages via `LockState` / `qs-bar:lock` shortcut. See its section below. |
+| `LockState.qml` (singleton) | `engaged` bool bridging lock triggers (PowerPopup's Lock action, future callers) to `Lockscreen.engage()`. Never set `engaged = false` to bypass auth — that's what TTY `loginctl unlock-session` is for. |
 | `WifiPopup.qml` | Wi-Fi toggle, networks sorted by signal (connected first), max 5 visible + scroll, inline password prompt (`connectWithPsk`). |
 | `BluetoothPopup.qml` | Adapter toggle, devices (paired first), pair/connect/disconnect on click. |
 | `PowerPopup.qml` | Power Off / Reboot / Suspend / Log Out / Hibernate / Lock (6 rows, 5 visible + scroll). Commands + letter keybinds mirror `~/.config/wlogout/layout`; grabs exclusive keyboard while open (`grabKeys`). |
@@ -434,6 +436,90 @@ store` daemon — the daemon and cliphist db are never touched by the shell.
     (parse ~1ms) so new copies appear without reopening; `parseList` must
     NOT reset `selIndex` (the poll would yank the selection to the top —
     only the open path resets it).
+
+### Lock screen (Lockscreen.qml, 2026-10-05)
+
+Hyprlock replacement. Runs INSIDE the main shell instance (user decision —
+not a standalone `qs -p` config "for now"): a `WlSessionLock` sits unlocked
+until something engages it; on success `LockState.engaged` drops and the
+bar keeps running. Styling is "blend into the wallpaper": NO card
+backgrounds (user explicitly rejected pill/card bgs for media, keyboard
+pill and password field) — dark palette text + soft white MultiEffect glow
+instead.
+
+- **0.3.1 API names**: `WlSessionLock` / `WlSessionLockSurface` in
+  `Quickshell.Wayland` (NOT `SessionLock*` — those are newer). The surface
+  component auto-instantiates per screen; there is NO `unlockRequested`
+  signal — unlock = `locked: false`. Killing quickshell while locked bricks
+  the session (protocol keeps it locked, solid color) → recovery: TTY +
+  `loginctl unlock-session`.
+- **`GlobalShortcut` resolves only via `import Quickshell.Hyprland`** (the
+  shortcuts live in an internal module that module re-exports) — `import
+  Quickshell` alone gives "GlobalShortcut is not a type" even though
+  shell.qml happens to also import Hyprland.
+- **A `QtObject` root cannot host children** ("Cannot assign to
+  non-existent default property") — Lockscreen's root is an invisible
+  `Item`. Also: `id:` values cannot contain dots.
+- **Trigger wiring**: `qs-bar:lock` GlobalShortcut. From SCRIPTS (hypridle
+  lock_cmd) plain `hyprctl dispatch global ...` and `dispatch eval` both die
+  in the Lua parser, but the bare **eval request works**:
+  `hyprctl eval 'hl.dsp.global("qs-bar:lock")'` → "ok" (verified). PowerPopup
+  Lock sets `LockState.engaged = true` (its `run()` takes the model entry;
+  entries carry either `cmd` or `act: "lock"`).
+- **PAM**: `PamContext` (`Quickshell.Services.Pam`) with `config: "login"` —
+  literally the stack hyprlock gets (`/etc/pam.d/hyprlock` is just `auth
+  include login`), so NO custom PAM file is needed (sudo unavailable in the
+  agent shell; `pamConfig` property can point at a custom file later).
+  Verified: `start()` → `pamMessage` "Password:" with `responseRequired:
+  true`. Gotchas: `pamMessage` has NO parameters (read `message`/
+  `responseRequired` off the object); `completed(result)` carries a
+  `PamResult` enum (Success/Failed/Error/MaxTries) — restart `start()` after
+  Failed/MaxTries, DON'T restart on Error (the `error` signal handles it);
+  Enter before the prompt arrives sets `pendingSubmit`, answered on the
+  first `pamMessage`. On engage, `pam.start()` failing locks anyway with an
+  on-screen "PAM unavailable" message (privacy over availability).
+- **MultiEffect semantics (cost a debug round)**: MultiEffect does NOT hide
+  its source — you must; and an INVISIBLE source still renders through the
+  effect (that's the whole glow pattern): source `visible: false`, the
+  effect item IS the rendering, and state visibility goes on the GLOW, not
+  the source. `opacity: 0` on the source is the documented variant that
+  KEEPS touch/click input (used for the media row + keyboard pill so their
+  handlers work). Shadow room = manual geometry + `autoPaddingEnabled:
+  false` + `paddingRect: Qt.rect(24,24,24,24)`; anchoring the effect to the
+  source with default autoPadding produced offset ghost-doubles. Qt docs:
+  doc.qt.io/qt-6/qml-qtquick-effects-multieffect.html.
+- **Time is 12h via manual math** (`timeText` property): Qt's `hh` is only
+  12-hour when `AP` is in the SAME format string, and the AM/PM is a
+  separate smaller Text here.
+- **hypridle-data polls**: one 250ms `hyprctl -j devices` Process (conf's
+  `cmd[update:250]` parity) feeds BOTH `capsLock` and `active_keymap` of the
+  main keyboard (fields verified via jq). `hyprctl switchxkblayout all
+  next` is a top-level hyprctl command — not a dispatch — so it works from
+  QML despite the Lua IPC change.
+- **weather.sh quirk**: the user's script prints ONLY on a cache hit; a
+  fresh fetch writes `/tmp/cache/wttr_cache.txt` and prints nothing. The
+  wrapper runs it then cats the cache (`sh -c 'bash "$1" >/dev/null; cat
+  /tmp/cache/wttr_cache.txt'`). Started at `Component.onCompleted` AND on
+  engage — the 60s timer alone missed the first minute.
+- **Commented-hyprlock-feature blocks live ACTIVE** (user verifies, then
+  comments out themselves): profile photo (150px circular, `profilePhotoPath`
+  — `~/Pictures/wallpapers/final_logo.png` does NOT exist yet, the block
+  self-hides via Image status), battery chip, weather, status line (invented
+  content: vol/mic/bt — original status.sh never existed), keyboard-layout
+  switcher, MPRIS media card (art via `trackArtUrl`, only while PLAYING —
+  widget-box-color.sh parity). hyprlock toggles are properties:
+  `hideInput`, `asteriskDots`.
+- **Preview/testing (NEVER real-lock from the agent)**: `/tmp/locktest.qml`
+  (keep out of the repo) imports the repo via the `file:` URL, applies
+  colors.css to Theme, and instantiates `Lockscreen { testMode: true }` —
+  the same content renders in an Overlay `PanelWindow`
+  (`quickshell:lockscreen-test`), Enter SIMULATES a wrong password (no PAM),
+  Esc closes when the buffer is empty. `testPreview`/`testState`/`testCaps`
+  render state variants; `LOCK_FAKE_MEDIA=1` forces the media card. Screenshot
+  ≥5s after launch (UPower populates ~3s — earlier shots showed no battery).
+  Round-1 black screenshots were a red herring: `hyprctl layers` + magick
+  pixel-scans showed the window mapped and painting; trust those over a
+  single Read of a PNG.
 
 ### Wallpaper switcher (Wallswitch.qml, 2026-10-04)
 
