@@ -22,13 +22,14 @@ the config on every file save — you do not need to restart to test QML edits).
 
 | File | Role |
 |---|---|
-| `shell.qml` | Entry point. `//@ pragma UseQApplication` is **required** (tray menus need it). Hosts the three `GlobalShortcut`s (`powermenu`, `notification`, `wallpapers`), the `NotificationServer` (once, NOT per-screen — see notification gotcha) and the `Toast`, `Osd` and `Wallswitch` windows. `Variants` spawns one `Bar` per screen (declared BEFORE `Wallswitch` so the picker's dim covers the bar). |
+| `shell.qml` | Entry point. `//@ pragma UseQApplication` is **required** (tray menus need it). Hosts the `GlobalShortcut`s (`powermenu` + `notification` under appid `qs-bar`, `wallpaper-switcher` under appid `qs`), the `NotificationServer` (once, NOT per-screen — see notification gotcha), the palette `FileView` (repo-local `colors.css`) and the `Toast`, `Osd` and `Wallswitch` windows. `Variants` spawns one `Bar` per screen (declared BEFORE `Wallswitch` so the picker's invisible input shield stacks above the bar). |
 | `Bar.qml` | 46px `PanelWindow` (layer Top). Anchors the three pills and instantiates the four `RicePopup`s + `TrayMenuPopup`. Also hosts `showTooltip()`/`hideTooltip()` which delegate to `TooltipWindow`. |
 | `Workspaces.qml` | Hyprland workspaces, min 5 persistent slots (`minCount`), click switches via dispatch. Urgent workspaces tint orange. Active cell is wider than idle/hover; first/last delegates draw "cap" circles so the active fill reaches the pill's rounded ends (see Workspaces gotcha). |
 | `ClockPill.qml` | Center pill: stateful bell + time (no clock glyph — removed 2026-10-04). Bell mirrors waybar's notification-module glyphs via `Notifs.unread`/`Notifs.dnd`; unread also boosts color from fgMuted to fg. Owns a `SystemClock`. Hover = date tooltip, click = dashboard popup. |
 | `StatusPill.qml` | Right pill: SystemTray items, volume (scroll ±1% / click mute), mic, wifi, bluetooth, battery, power. Exposes `wifiRightX`/`btRightX`/`powerRightX` so Bar can anchor popups under the right icons — **do not delete these**, the popups depend on them. |
 | `Popups.qml` (singleton) | `active` = name of the open popup ("" / "clock" / "wifi" / "bt" / "power" / "tray" / "wall"). Single source of truth for popup exclusivity. `lastDismiss` guards against the outside-click that dismissed a popup re-triggering a toggle. |
 | `RicePopup.qml` | Base class for dash/wifi/bt/power popups: full-screen transparent layer-shell "shield", visible rounded panel anchored inside it, closes on outside click / `Esc` / `Popups.active` change. `panelWidth` + optional `panelHeight` (0 = auto-size from content); panel x is clamped to the screen. |
+| `ClipboardPopup.qml` | Clipboard history panel (cliphist backend, rofi picker replacement): search + category chips, preview cards, decode-on-demand thumbnails, pin sidecar. See its section below. |
 | `WifiPopup.qml` | Wi-Fi toggle, networks sorted by signal (connected first), max 5 visible + scroll, inline password prompt (`connectWithPsk`). |
 | `BluetoothPopup.qml` | Adapter toggle, devices (paired first), pair/connect/disconnect on click. |
 | `PowerPopup.qml` | Power Off / Reboot / Suspend / Log Out / Hibernate / Lock (6 rows, 5 visible + scroll). Commands + letter keybinds mirror `~/.config/wlogout/layout`; grabs exclusive keyboard while open (`grabKeys`). |
@@ -231,11 +232,23 @@ pill as the `yItem` so every tooltip sits at one height. Toast sits at
   workspaces pill), centered via 5px top margins in the 46px bar.
 
 ### Palette is matugen-driven + fonts are uniform (2026-10-04)
-- `shell.qml` hosts a `FileView` watching `~/.config/waybar/colors.css` (the
-  matugen template output waybar consumed). Chain: `watchChanges: true` →
+- `shell.qml` hosts a `FileView` watching `<repo>/colors.css` — since
+  2026-10-04 the matugen template lives IN this repo
+  (`[templates.quickshell]` in `~/.config/matugen/config.toml`, output
+  `~/Documents/Dev/quickshell_rice/colors.css`; the old
+  `~/.config/waybar/colors.css` path and its `[templates.waybar]` block are
+  retired — the user comments the waybar block out whenever they get to it).
+  Chain: `watchChanges: true` →
   `onFileChanged: reload()` → `onLoaded: Theme.applyPaletteCss(text())` →
   Theme color properties update → every binding follows. Verified live with
   BOTH write styles (in-place and sed -i rename) — pixel-sampled transitions.
+- **matugen 4.2 config traps**: the `[config.wallpaper]` section must EXIST
+  even when it only says `set = false` — commenting the whole block out
+  aborts every matugen invocation with "missing field `config`", and the
+  section's `command`/`arguments` fields are required too ("missing field
+  `command`") even though they're never executed while `set = false`. Both
+  were hit live when the block got fully commented out — every apply fails
+  until it's restored.
 - **FileView traps**: the public `text` is a FUNCTION that shadows the
   internal property (`text()` — passing bare `text` hands the parser a
   function object and it silently matches nothing); `watchChanges` fires
@@ -248,8 +261,7 @@ pill as the `yItem` so every tooltip sits at one height. Toast sits at
   `on_secondary` → fg, `error` → urgent, `error_container` → danger
   (dark tone, readable as text on light pills). Derived tones (fgMuted,
   track, divider, border, rowHover, inputBg) stay formulaic on top of the
-  roles — don't give them matugen roles. If the waybar directory is ever
-  deleted, point the template output elsewhere and update the path.
+  roles — don't give them matugen roles.
 - All non-icon text: `Theme.textSize` (14.5) in Rubik, **no font.weight
   anywhere** (single rule, mirrors the waybar CSS). Only NIcon sizes differ.
   Icon glyphs remain the nerd font via `Theme.nerdFont`.
@@ -320,6 +332,55 @@ any log). Cause: corrupt `~/.cache/quickshell` and/or
 `/run/user/1000/quickshell/vfs` entries. `rm -rf` both and relaunch — cost
 most of a session before being identified.
 
+### Clipboard panel (ClipboardPopup.qml, 2026-10-05)
+
+Rofi clipboard picker replacement on the existing `wl-paste --watch cliphist
+store` daemon — the daemon and cliphist db are never touched by the shell.
+
+- **Trigger**: `GlobalShortcut` appid `qs-bar`, name `clipboard` →
+  `Popups.toggle("clip")`; instantiated in `Bar.qml` with
+  `anchorX: bar.width / 2` (that line + `centerOnAnchor` are the position
+  knobs; panel size knobs sit at the top of ClipboardPopup.qml).
+- **Data**: one `cliphist list` per open. Lines are `id\tpreview`
+  (tab-separated); multi-line continuations don't match `^\d+\t` and are
+  skipped. Categories: image when the preview starts with `[[ binary data `
+  (header is `[[ binary data <size-with-unit> <ext> <W>x<H> ]]` — the size
+  token can contain a space, so the regex is lazy: `.*? (\w+) (\d+)x(\d+)`),
+  link on `^https?://`, else text. `<meta http-equiv=` previews are skipped
+  (HTML title junk, same as the user's rofi script). Everything after this
+  is in-memory JS filtering — no watchers, no per-keystroke processes.
+- **Decode on demand ONLY**: restore (`printf "%s\n" "$raw" | cliphist
+  decode | wl-copy` — pipe is binary-safe), delete (same stdin shape), and
+  image thumbnails (first visible render decodes to
+  `~/.cache/quickshell_rice/clipboard-<id>.<ext>`, persistent → later opens
+  free; a `thumbs` id-array reassignment drives the Image source bindings —
+  mutating an array in place would NOT). Expanded text decodes capped at
+  64KB (`head -c`). Search matches previews only (~100 chars) — full-content
+  search would decode 200 entries per keystroke.
+- **Pins**: sidecar `~/.cache/quickshell_rice/clipboard-pins`, one id per
+  line, written via a Process. Read it with a Process too (`cat`, missing
+  file = empty output) — the FileView failed-load callback timing once
+  silently reverted a pin race-style; the Process read is deterministic.
+  Pinned ids sort first via a stable sort. Pruned ids vanish silently.
+- **Buttons are mouse-only by design**: ⤢/☆/✕ are plain MouseAreas — never
+  focused, not in the tab order, no keybinds. Keyboard exists solely to
+  iterate cards (fast list walking): Tab/Backtab/Up/Down move, Enter
+  restores the selected card. The ✕ is hover-only and its hovered state
+  must NOT live in the button Repeater's model array (it would rebuild the
+  buttons every time the mouse crosses a row) — the delegate reads the row
+  hover itself. Link cards have no ⤢ (nothing to expand).
+- **Space types a space in the search field** (deviation from the original
+  plan's "Space restores" — a visible search field must accept spaces);
+  Enter restores. `searchText` is an ALIAS of the TextField's text — the
+  filter binding reads it, so typing filters with zero glue code; the
+  open-reset clears the FIELD (a separate `searchText` state var once
+  diverged from the field: filter ran while the field looked empty).
+- **TextField key handling**: arrows/Tab must be intercepted via
+  `Keys.onPressed` (there is no `Keys.onTabPressed` attached handler);
+  Left/Right/Home/End stay unintercepted for cursor movement. First Esc
+  clears the search (accepted in the field), second bubbles to the body's
+  `Keys.onEscapePressed` → close.
+
 ### Wallpaper switcher (Wallswitch.qml, 2026-10-04)
 
 skwd-wall's "Slices" picker, ported to QML minus the feature buffet. Replaces
@@ -328,9 +389,11 @@ the rofi `~/.config/rofi/wallpaper-switcher/wall-switcher.sh` flow entirely
 `variables.lua` are dead weight now — the picker shells out to the binaries
 directly).
 
-- **Trigger**: `GlobalShortcut` name `wallpapers` (appid `qs-bar`) →
-  `Popups.toggle("wall")`. User binds e.g.
-  `hl.bind(mainMod .. " + W", hl.dsp.global("qs-bar:wallpapers"))`. The
+- **Trigger**: `GlobalShortcut` appid `qs`, name `wallpaper-switcher` →
+  `Popups.toggle("wall")` (its OWN appid, not `qs-bar` — the user wanted the
+  picker identifiable as a desktop tool rather than a bar feature). User
+  binds e.g.
+  `hl.bind(mainMod .. " + W", hl.dsp.global("qs:wallpaper-switcher"))`. The
   window is instantiated once at shell root AFTER `Variants` — the
   fullscreen shield is INVISIBLE (no dim; user rejected the dark backdrop:
   skwd floats over the live desktop) and must stack above the bar so a bar
@@ -339,7 +402,10 @@ directly).
   path/transition passed as positional argv (filename-proof):
   `awww img "$1" --transition-type "$2" --transition-duration 1.2
   --transition-fps 60 && matugen image "$1" --prefer darkness --config …`.
-  `$2` is a random of fade/wipe/outer/grow/slide (the old script's set).
+  `$2` is a random of fade/wipe/outer/grow/random. NB: the old rofi script's
+  fifth entry `slide` is NOT a valid awww 0.12.1 transition — every apply
+  that rolled it failed with "invalid value 'slide'" and (via the `&&`)
+  silently skipped matugen too. Keep transition values inside awww's set.
   **matugen's `config.toml` must keep `[config.wallpaper] set = false`** —
   user-verified: with `false` matugen only regenerates templates (incl. the
   `hyprctl reload` post-hook), with `true` it re-applies the wallpaper with

@@ -48,11 +48,13 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
    ```
 
 3. **Keybinds** — in `~/.config/hypr/config/keybinds.lua` (the bar registers
-   three global shortcuts under appid `qs-bar`):
+   two global shortcuts under appid `qs-bar`; the wallpaper picker is its own
+   desktop tool and registers under `qs`):
    ```lua
-   hl.bind(mainMod .. " + X", hl.dsp.global("qs-bar:powermenu"))     -- power popup
-   hl.bind(mainMod .. " + N", hl.dsp.global("qs-bar:notification"))  -- dashboard
-   hl.bind(mainMod .. " + W", hl.dsp.global("qs-bar:wallpapers"))    -- wallpaper picker
+   hl.bind(mainMod .. " + X", hl.dsp.global("qs-bar:powermenu"))          -- power popup
+   hl.bind(mainMod .. " + N", hl.dsp.global("qs-bar:notification"))       -- dashboard
+   hl.bind(mainMod .. " + W", hl.dsp.global("qs:wallpaper-switcher"))     -- wallpaper picker
+   hl.bind(mainMod .. " + V", hl.dsp.global("qs-bar:clipboard"))          -- clipboard panel
    ```
    The OSD watches real device state, so volume/brightness keys need no helper
    scripts — call the tools directly (scripts from a swaync setup are fully
@@ -87,15 +89,18 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
    `hl.layer_rule` has no `opacity` field anyway.
 
 5. **Palette (matugen)** — `~/.config/matugen/config.toml` must generate the
-   colors file the bar watches:
+   colors file the bar watches, inside this repo:
    ```toml
-   [templates.waybar-colors]
+   [templates.quickshell]
    input_path = '~/.config/matugen/templates/colors.css'
-   output_path = '~/.config/waybar/colors.css'
+   output_path = '~/Documents/Dev/quickshell_rice/colors.css'
    ```
    No `post_hook` needed — the bar watches the file and recolors live. Run
-   matugen once against your wallpaper (`matugen image <wallpaper>` or your
-   usual wallpaper-switch keybind); until then the fallback pink palette shows.
+   matugen once against your wallpaper (`matugen image <wallpaper>` or the
+   wallpaper picker's apply); until then the fallback pink palette shows.
+   NB: keep the `[config.wallpaper]` section present even with
+   `set = false` — matugen 4.2 aborts with "missing field" if the block or
+   its `command`/`arguments` fields are removed.
 
 6. **Notifications** — this bar **is** the notification daemon (toasts +
    dashboard history). Make sure no other daemon autostarts: remove `swaync`,
@@ -123,6 +128,7 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
 | Battery | UPower percentage + state icon (charging/discharging sets, same glyphs as the waybar config); hover tooltip shows time remaining. |
 | Power | Click opens **Lock / Log Out / Reboot / Power Off**. Keyboard: `Tab`/arrows or the wlogout letters (`s`/`r`/`u`/`l`/`h`/`o`), `Enter` runs the action, `Esc` closes. |
 | Wallpaper picker | `SUPER+W` opens a **skwd-wall-style picker** floating over the live desktop: four right-leaning slanted slices per side of a fixed 16:9 center frame, the selected wallpaper enlarged behind an accent border (starts on the current wallpaper; only the focused one shows its filename chip). Scroll / arrow keys / click a slice to preview it centered; click the centered one or press `Enter`/`Space` to apply — `awww` with a random transition, then `matugen` regenerates the whole palette live (requires `[config.wallpaper] set = false` in matugen's config so it never re-applies the image itself). **Type to search**: printable keys filter the set live with a `query · matches` chip above the row, `Backspace` edits, `Esc` clears the search first. `Esc` (with empty search) or clicking bare desktop closes. An optional `dimaround` layer rule (see setup step 4) dims the desktop behind it. Replaces the old rofi `wall-switcher.sh` flow. |
+| Clipboard history | `SUPER+V` opens a **cliphist-backed panel** (replaces the rofi clipboard picker; your `wl-paste --watch cliphist store` daemon stays as-is): a search field, All/Text/Image/Link chips with live counts, and compact preview cards. Click a card (or `Enter` on the selected one) to paste it back; cards show 3 lines of text, tinted links, or image thumbnails (decoded once, cached under `~/.cache/quickshell_rice/`). Per-card buttons: expand text to full content / images to true aspect, pin (pinned cards sort first, `☆`→`★`), hover-`✕` deletes from cliphist. Keyboard-first: arrows/`Tab` iterate cards, typing searches, `Esc` clears the search first. |
 
 All icons are **Nerd Font glyphs** (JetBrains Mono Nerd Font Propo) using the
 same codepoints as `~/.config/waybar/config.jsonc` — battery levels, volume,

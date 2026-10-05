@@ -1,8 +1,8 @@
 pragma Singleton
 import QtQml
 
-// Which popup is currently open ("clock", "wifi", "bt", "power", "tray" or
-// "wall").
+// Which popup is currently open ("clock", "wifi", "bt", "power", "tray",
+// "wall" or "clip").
 QtObject {
     property string active: ""
     property real lastDismiss: 0

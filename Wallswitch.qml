@@ -46,8 +46,9 @@ PanelWindow {
     property int selectedPos: 0         // `selected`'s position within `shown`
 
     readonly property string wallDir: Quickshell.env("HOME") + "/Pictures/wallpapers/images"
-    // same five the old rofi switcher picked from
-    readonly property var transitions: ["fade", "wipe", "outer", "grow", "slide"]
+    // random pick per apply. NB: 'slide' (in the old rofi script's list) is
+    // NOT a valid awww transition — it fails the whole apply
+    readonly property var transitions: ["fade", "wipe", "outer", "grow", "random"]
 
     // ---- geometry (fractions of the screen, tuned on eDP-1 1920x1080 to
     // match the skwd reference: relaxed lean, 4 strips per side, desktop

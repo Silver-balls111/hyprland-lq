@@ -26,14 +26,25 @@ ShellRoot {
         onPressed: Popups.toggle("clock")
     }
 
-    // mainMod+W — the slanted wallpaper picker (replaces the old rofi
-    // wall-switcher.sh flow entirely). Bind line for the user's Lua config:
-    // hl.bind(mainMod .. " + W", hl.dsp.global("qs-bar:wallpapers"))
+    // mainMod+W — the slanted wallpaper picker. NOT a bar feature (it's a
+    // fullscreen desktop tool), so it registers under its own appid instead
+    // of qs-bar. Bind line for the user's Lua config:
+    // hl.bind(mainMod .. " + W", hl.dsp.global("qs:wallpaper-switcher"))
     GlobalShortcut {
-        appid: "qs-bar"
-        name: "wallpapers"
+        appid: "qs"
+        name: "wallpaper-switcher"
         description: "Toggle the wallpaper picker"
         onPressed: Popups.toggle("wall")
+    }
+
+    // mainMod+V — clipboard history panel (cliphist backend, rofi picker
+    // replacement). The user binds it in their Lua config:
+    // hl.bind("SUPER + V", hl.dsp.global("qs-bar:clipboard"))
+    GlobalShortcut {
+        appid: "qs-bar"
+        name: "clipboard"
+        description: "Toggle the clipboard history panel"
+        onPressed: Popups.toggle("clip")
     }
 
     // The notification daemon — replaces swaync. Instantiated once here at the
@@ -53,11 +64,13 @@ ShellRoot {
         onNotification: notification => Notifs.push(notification)
     }
 
-    // Palette overlay: reads the matugen-generated colors.css (the same file
-    // waybar consumed) and feeds Theme; watchChanges re-applies it live on
+    // Palette overlay: reads the matugen-generated colors.css — written into
+    // THIS repo by the [templates.quickshell] block of
+    // ~/.config/matugen/config.toml (the old ~/.config/waybar/colors.css
+    // path is retired) — and feeds Theme; watchChanges re-applies it live on
     // every wallpaper change (matugen regenerates the file).
     FileView {
-        path: Quickshell.env("HOME") + "/.config/waybar/colors.css"
+        path: Quickshell.env("HOME") + "/Documents/Dev/quickshell_rice/colors.css"
         watchChanges: true
         blockLoading: true
         printErrors: true

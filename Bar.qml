@@ -78,5 +78,12 @@ PanelWindow {
             barWindow: bar
             anchorX: statusPill.x + statusPill.powerRightX
         }
+
+        ClipboardPopup {
+            barWindow: bar
+            // position knob: change anchorX (and/or centerOnAnchor inside
+            // ClipboardPopup) to move the panel
+            anchorX: bar.width / 2
+        }
     }
 }

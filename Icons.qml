@@ -70,6 +70,12 @@ QtObject {
         // f04d renders as a filled SQUARE in this font (codepoint collision) —
         // "forward" f04e is the ▶▶ pair-mate of "prev" f049's ◀◀
         "prev": String.fromCodePoint(0xF049),
-        "next": String.fromCodePoint(0xF04E)
+        "next": String.fromCodePoint(0xF04E),
+        // clipboard panel
+        "search": String.fromCodePoint(0xF002),
+        "expand": String.fromCodePoint(0xF065),
+        "star": String.fromCodePoint(0xF006),
+        "starFill": String.fromCodePoint(0xF005),
+        "clipboard": String.fromCodePoint(0xF0EA)
     }
 }

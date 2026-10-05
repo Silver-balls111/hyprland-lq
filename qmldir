@@ -5,6 +5,7 @@ singleton Notifs 1.0 Notifs.qml
 Bar 1.0 Bar.qml
 BluetoothPopup 1.0 BluetoothPopup.qml
 CalendarPanel 1.0 CalendarPanel.qml
+ClipboardPopup 1.0 ClipboardPopup.qml
 ClockPill 1.0 ClockPill.qml
 DashPopup 1.0 DashPopup.qml
 NIcon 1.0 NIcon.qml
