@@ -340,7 +340,12 @@ After QML edits, a shell can map its window but paint *nothing* (wallpaper
 shows through, `hyprctl layers` still lists the surface, **zero** errors in
 any log). Cause: corrupt `~/.cache/quickshell` and/or
 `/run/user/1000/quickshell/vfs` entries. `rm -rf` both and relaunch — cost
-most of a session before being identified.
+most of a session before being identified. 2026-10-05 addendum: it can hit a
+SINGLE window after a rework (the toast stack mapped with correct geometry
+and painted nothing while the rest of the shell rendered fine) — same fix.
+Also: notification wrappers can die out-of-band even when `tracked` was set
+(server-side lifecycle) — guard every `notif.expire()/dismiss()` call with
+try/catch or the toast ticker throws "Type error is not a function".
 
 ### Clipboard panel (ClipboardPopup.qml, 2026-10-05)
 

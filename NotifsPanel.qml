@@ -58,7 +58,7 @@ Item {
     // staggered removal for Clear / last-row removal
     Timer {
         id: cascadeTimer
-        interval: 14
+        interval: 30
         repeat: true
         onTriggered: {
             if (Notifs.history.length > 0 || historyModel.count === 0) {
@@ -208,7 +208,7 @@ Item {
             id: notifList
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: count > 0
+            visible: count > 0 || cascadeTimer.running
             clip: true
             spacing: 2
             boundsBehavior: Flickable.StopAtBounds
@@ -366,7 +366,7 @@ Item {
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: notifList.count === 0
+            visible: notifList.count === 0 && !cascadeTimer.running
 
             Column {
                 anchors.centerIn: parent

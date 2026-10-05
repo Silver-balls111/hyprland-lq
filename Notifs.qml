@@ -107,18 +107,16 @@ QtObject {
             root.activeToasts = next;
         }
         if (entry.notif) {
-            if (byUser) entry.notif.dismiss();
-            else entry.notif.expire();
+            // the wrapper can die out-of-band (server-side lifecycle) — a dead
+            // wrapper throws "Type error is not a function" on any method call
+            try {
+                if (byUser) entry.notif.dismiss();
+                else entry.notif.expire();
+            } catch (err) {
+                console.warn("dismissToast: notif wrapper already gone:", err);
+            }
             entry.notif = null;
         }
-    }
-
-    // toast card expand/collapse: expanded cards freeze their deadline
-    function toggleToastExpanded(entry) {
-        entry.expanded = !entry.expanded;
-        if (!entry.expanded)
-            entry.expiresAt = Math.max(entry.expiresAt, Date.now() + 2000);
-        root.activeToasts = root.activeToasts.slice(); // re-render the stack
     }
 
     function remove(index) {
@@ -135,7 +133,10 @@ QtObject {
         const list = root.activeToasts;
         root.activeToasts = [];
         for (let i = 0; i < list.length; i++) {
-            if (list[i].notif) { list[i].notif.expire(); list[i].notif = null; }
+            if (list[i].notif) {
+                try { list[i].notif.expire(); } catch (err) { console.warn("clearAll: notif wrapper already gone:", err); }
+                list[i].notif = null;
+            }
         }
         root.history = [];
     }

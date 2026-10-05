@@ -54,6 +54,16 @@ PanelWindow {
                 required property var modelData
                 readonly property bool urgent: modelData.urgency === 2
 
+                // local mirror of the entry's expanded flag: toggling the LOCAL
+                // property animates the height, and onExpandedChanged keeps the
+                // entry in sync — mutating the entry alone is not reactive, and
+                // reassigning the stack would rebuild the card mid-animation
+                property bool expanded: modelData.expanded
+                onExpandedChanged: {
+                    modelData.expanded = expanded;
+                    if (!expanded)
+                        modelData.expiresAt = Math.max(modelData.expiresAt, Date.now() + 2000);
+                }
 
                 width: stackCol.width
                 height: cardCol.implicitHeight + 20
@@ -127,7 +137,7 @@ PanelWindow {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: Notifs.toggleToastExpanded(toastCard.modelData)
+                    onClicked: toastCard.expanded = !toastCard.expanded
                 }
 
                 // dismiss ✕ — declared AFTER the fullscreen MouseArea so it
