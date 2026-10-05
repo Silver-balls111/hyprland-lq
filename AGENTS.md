@@ -30,7 +30,7 @@ the config on every file save — you do not need to restart to test QML edits).
 | `Popups.qml` (singleton) | `active` = name of the open popup ("" / "clock" / "wifi" / "bt" / "power" / "tray" / "wall"). Single source of truth for popup exclusivity. `lastDismiss` guards against the outside-click that dismissed a popup re-triggering a toggle. |
 | `RicePopup.qml` | Base class for dash/wifi/bt/power popups: full-screen transparent layer-shell "shield", visible rounded panel anchored inside it, closes on outside click / `Esc` / `Popups.active` change. `panelWidth` + optional `panelHeight` (0 = auto-size from content); panel x is clamped to the screen. |
 | `ClipboardPopup.qml` | Clipboard history panel (cliphist backend, rofi picker replacement): search + category chips, preview cards, decode-on-demand thumbnails, pin sidecar. See its section below. |
-| `Lockscreen.qml` | Session lock (hyprlock replacement): blurred awww wallpaper, 12h clock + date, PAM password dots, battery chip + weather + status (right column), MPRIS media card, keyboard-layout switcher. Lives in the main shell instance; engages via `LockState` / `qs-bar:lock` shortcut. See its section below. |
+| `Lockscreen.qml` | Session lock (hyprlock replacement): blurred awww wallpaper, 12h clock + date, PAM password dots, battery + weather + status (right column), MPRIS media card, keyboard-layout switcher. Lives in the main shell instance; engages via `LockState` / `qs-bar:lock` shortcut. See its section below. |
 | `LockState.qml` (singleton) | `engaged` bool bridging lock triggers (PowerPopup's Lock action, future callers) to `Lockscreen.engage()`. Never set `engaged = false` to bypass auth — that's what TTY `loginctl unlock-session` is for. |
 | `WifiPopup.qml` | Wi-Fi toggle, networks sorted by signal (connected first), max 5 visible + scroll, inline password prompt (`connectWithPsk`). |
 | `BluetoothPopup.qml` | Adapter toggle, devices (paired first), pair/connect/disconnect on click. |
@@ -442,10 +442,22 @@ store` daemon — the daemon and cliphist db are never touched by the shell.
 Hyprlock replacement. Runs INSIDE the main shell instance (user decision —
 not a standalone `qs -p` config "for now"): a `WlSessionLock` sits unlocked
 until something engages it; on success `LockState.engaged` drops and the
-bar keeps running. Styling is "blend into the wallpaper": NO card
-backgrounds (user explicitly rejected pill/card bgs for media, keyboard
-pill and password field) — dark palette text + soft white MultiEffect glow
-instead.
+bar keeps running. Styling per user feedback (round 3): NOTHING sits on a
+card/chip and NO text has any shadow/glow — every text is plain palette
+text over the blur (the soft white MultiEffect glow was tried and
+explicitly rejected as a "weird effect"); legibility is the wallpaper's
+problem. The battery chip was rejected too (kept as a comment in the right
+column). Password dots are 5px; fail feedback is a thin gradient border
+(Canvas — Rectangle borders can't take gradients) that shows ONCE at full
+strength and fades out over 1.8s — NO ring while verifying and NO looping
+animation (user spec). Caps/fail labels are 12px; the fail text says
+"Authentication failed". Readability is solved by SAMPLING: a 16x9 offscreen
+Canvas (`lumSampler`, loadImage + getImageData) averages the wallpaper's
+luminance and flips `root.wallDark`, which drives `lockFg`/`lockFgMuted` —
+light text on dark wallpapers, dark palette fg on light ones. Caps state:
+single-flight `hyprctl -j devices` probe (1s timer guarded on
+`Process.running`, plus an immediate re-probe on the CapsLock keypress in
+`handleKey`); the capsLock field is only assigned when present.
 
 - **0.3.1 API names**: `WlSessionLock` / `WlSessionLockSurface` in
   `Quickshell.Wayland` (NOT `SessionLock*` — those are newer). The surface
@@ -478,15 +490,15 @@ instead.
   Enter before the prompt arrives sets `pendingSubmit`, answered on the
   first `pamMessage`. On engage, `pam.start()` failing locks anyway with an
   on-screen "PAM unavailable" message (privacy over availability).
-- **MultiEffect semantics (cost a debug round)**: MultiEffect does NOT hide
-  its source — you must; and an INVISIBLE source still renders through the
-  effect (that's the whole glow pattern): source `visible: false`, the
-  effect item IS the rendering, and state visibility goes on the GLOW, not
-  the source. `opacity: 0` on the source is the documented variant that
-  KEEPS touch/click input (used for the media row + keyboard pill so their
-  handlers work). Shadow room = manual geometry + `autoPaddingEnabled:
-  false` + `paddingRect: Qt.rect(24,24,24,24)`; anchoring the effect to the
-  source with default autoPadding produced offset ghost-doubles. Qt docs:
+- **MultiEffect semantics (cost a debug round, still true even though the
+  text-glow was removed)**: MultiEffect does NOT hide its source — you
+  must set `visible: false` yourself, and an INVISIBLE source still renders
+  through the effect. `opacity: 0` on the source is the documented variant
+  that KEEPS touch/click input. Anchoring the effect to the source with
+  default autoPadding produced offset ghost-doubles; manual geometry +
+  `autoPaddingEnabled: false` + `paddingRect` is deterministic. This now
+  only matters for the wallpaper blur and the RoundedImage mask
+  (photo/album art). Qt docs:
   doc.qt.io/qt-6/qml-qtquick-effects-multieffect.html.
 - **Time is 12h via manual math** (`timeText` property): Qt's `hh` is only
   12-hour when `AP` is in the SAME format string, and the AM/PM is a
@@ -501,14 +513,18 @@ instead.
   wrapper runs it then cats the cache (`sh -c 'bash "$1" >/dev/null; cat
   /tmp/cache/wttr_cache.txt'`). Started at `Component.onCompleted` AND on
   engage — the 60s timer alone missed the first minute.
-- **Commented-hyprlock-feature blocks live ACTIVE** (user verifies, then
-  comments out themselves): profile photo (150px circular, `profilePhotoPath`
+- **Commented-hyprlock-feature blocks** (user verifies, then comments out
+  themselves): profile photo (150px circular, `profilePhotoPath`
   — `~/Pictures/wallpapers/final_logo.png` does NOT exist yet, the block
-  self-hides via Image status), battery chip, weather, status line (invented
+  self-hides via Image status), weather, status line (invented
   content: vol/mic/bt — original status.sh never existed), keyboard-layout
   switcher, MPRIS media card (art via `trackArtUrl`, only while PLAYING —
-  widget-box-color.sh parity). hyprlock toggles are properties:
-  `hideInput`, `asteriskDots`.
+  widget-box-color.sh parity). The battery chip was REJECTED in round 3 —
+  it survives only as a comment in the right column. hyprlock toggles are
+  properties: `hideInput`, `asteriskDots`. Design reference the user pointed
+  at: end-4/dots-hyprland `ii` quickshell module (lock/polkit folders) —
+  their Lock visuals live in `common/panels/lock`, `PasswordChars.qml` shows
+  their per-char Material shapes.
 - **Preview/testing (NEVER real-lock from the agent)**: `/tmp/locktest.qml`
   (keep out of the repo) imports the repo via the `file:` URL, applies
   colors.css to Theme, and instantiates `Lockscreen { testMode: true }` —

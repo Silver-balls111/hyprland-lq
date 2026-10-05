@@ -66,6 +66,14 @@ Item {
     property string weatherText: ""
     property string wallpaperPath: ""
 
+    // ── adaptive text colors (readability on any wallpaper) ───────────────
+    // the wallpaper's average luminance is sampled once per lock (see
+    // lumSampler in the content); dark wallpapers get light text, light
+    // wallpapers keep the dark palette fg — no shadows, no cards (user spec)
+    property bool wallDark: false
+    readonly property color lockFg: wallDark ? "#f2f2f2" : Theme.fg
+    readonly property color lockFgMuted: wallDark ? Qt.rgba(1, 1, 1, 0.62) : Theme.fgMuted
+
     readonly property string effBuffer: testMode && testPreview !== "" ? testPreview : buffer
     readonly property string effState: testMode && testState !== "" ? testState : authState
     readonly property bool capsActive: (testMode && testCaps) || capsOn
@@ -242,7 +250,7 @@ Item {
     Timer { id: testSimTimer; interval: 900
         onTriggered: {
             root.authState = "failed";
-            root.failMessage = "Wrong password (simulated)";
+            root.failMessage = "Authentication failed (simulated)";
             root.buffer = "";
             failResetTimer.restart();
         }
@@ -250,6 +258,11 @@ Item {
 
     function handleKey(event) {
         const k = event.key;
+        if (k === Qt.Key_CapsLock) {
+            event.accepted = true;
+            if (!devicesProbe.running) devicesProbe.running = true; // fresh state right now
+            return;
+        }
         if (k === Qt.Key_Escape) {
             event.accepted = true;
             if (buffer !== "") { buffer = ""; return; } // hyprlock: Esc clears
@@ -340,24 +353,25 @@ Item {
                     const d = JSON.parse(text);
                     const kbs = d.keyboards || [];
                     const main = kbs.find(k => k.main === true) || kbs[0];
-                    if (main) {
-                        root.capsOn = main.capsLock === true;
-                        root.kbdLayout = main.active_keymap || "";
-                    }
+                    if (main && main.capsLock !== undefined)
+                        root.capsOn = main.capsLock === true; // missing field = keep last state
+                    if (main) root.kbdLayout = main.active_keymap || "";
                 } catch (e) {
                     console.warn("lockscreen: hyprctl devices parse failed:", e);
                 }
             }
         }
     }
-    // conf parity: capsLock label polled at 250ms; the same probe feeds the
-    // keyboard-layout label
+    // capsLock label poll; the same probe feeds the keyboard-layout label.
+    // Single-flight (never spawn while one is in flight) — overlapping
+    // results could land out of order and resurrect a stale caps state.
+    // Re-probed immediately on CapsLock keypresses (see handleKey).
     Timer {
         id: devicesTimer
-        interval: 250
+        interval: 1000
         repeat: true
         running: LockState.engaged || root.testMode
-        onTriggered: devicesProbe.running = true
+        onTriggered: if (!devicesProbe.running) devicesProbe.running = true
     }
 
     Process {
@@ -429,25 +443,8 @@ Item {
         }
     }
 
-    // Soft white glow behind dark palette text so it stays readable on any
-    // wallpaper. MultiEffect does NOT hide its source (Qt docs: you must set
-    // visible:false yourself — the effect still samples it), so every Glow
-    // source below is a visible:false Text and the effect IS the rendering.
-    // The item is grown symmetrically (paddingRect) so the shadow is not
-    // clipped; autoPadding off keeps geometry fully deterministic.
-    component Glow: MultiEffect {
-        x: source.x - 24
-        y: source.y - 24
-        width: source.width + 48
-        height: source.height + 48
-        autoPaddingEnabled: false
-        paddingRect: Qt.rect(24, 24, 24, 24)
-        shadowEnabled: true
-        shadowBlur: 0.4
-        shadowColor: "#ffffff"
-        shadowOpacity: 0.7
-        shadowVerticalOffset: 1
-    }
+    // NOTE: no text shadows/glows anywhere — the user rejected the soft
+    // white halo ("weird effect"); every text renders plain over the blur.
 
     // ═══════════════════════════ the lock screen content ═══════════════════
     Component {
@@ -495,13 +492,31 @@ Item {
                 blur: 1.0
             }
 
+            // samples the wallpaper's average luminance once per load and
+            // flips root.wallDark, which drives lockFg/lockFgMuted above
+            Canvas {
+                id: lumSampler
+                visible: false
+                width: 16
+                height: 9
+                readonly property string wallUrl: root.wallpaperPath !== ""
+                    ? "file://" + root.wallpaperPath : ""
+                onWallUrlChanged: if (wallUrl !== "") loadImage(wallUrl)
+                onImageLoaded: {
+                    const ctx = getContext("2d");
+                    ctx.clearRect(0, 0, width, height);
+                    ctx.drawImage(wallUrl, 0, 0, width, height);
+                    const d = ctx.getImageData(0, 0, width, height).data;
+                    let sum = 0;
+                    for (let i = 0; i < d.length; i += 4)
+                        sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+                    root.wallDark = sum / (d.length / 4) < 128;
+                }
+            }
+
             // ── clock + date ──────────────────────────────────────────────
-            // the grabbed source (timeBlock) is visible:false — its Glow
-            // effect is the rendering; the Text children stay visible so they
-            // land in the effect's texture (nested visible:false would not)
             Item {
                 id: timeBlock
-                visible: false
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: Math.round(parent.height * 0.13)
                 width: bigTime.width + 10 + apTime.width
@@ -512,7 +527,7 @@ Item {
                     x: 0
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.timeText
-                    color: Theme.fg
+                    color: root.lockFg
                     font.family: Theme.fontFamily
                     font.pixelSize: 64
                 }
@@ -521,25 +536,22 @@ Item {
                     x: bigTime.width + 10
                     anchors.baseline: bigTime.baseline
                     text: root.ampmText
-                    color: Theme.fgMuted
+                    color: root.lockFgMuted
                     font.family: Theme.fontFamily
                     font.pixelSize: 20
                 }
             }
-            Glow { source: timeBlock }
             Text {
                 id: dateLabel
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.top: timeBlock.bottom
-                anchors.topMargin: 8
-                visible: false
+                anchors.topMargin: 16
                 // date +"%A, %B %d"
                 text: Qt.formatDate(root.now, "dddd, MMMM dd")
-                color: Theme.fgMuted
+                color: root.lockFgMuted
                 font.family: Theme.fontFamily
                 font.pixelSize: 19
             }
-            Glow { source: dateLabel }
 
             // ── profile photo [hyprlock "Profile-Photo" block] ────────────
             // hidden until the image exists; point profilePhotoPath elsewhere
@@ -565,37 +577,65 @@ Item {
             }
 
             // ── password field ────────────────────────────────────────────
-            // outer ring = state gradient (conf check_color / fail_color),
-            // inner = the rice pill; idle state is inner-only
-            Rectangle {
-                id: fieldOuter
+            // the field itself is invisible (hyprlock parity: transparent
+            // fill and outline) — only the dots show. On FAIL a thin
+            // gradient border highlights the outline ONCE and fades away
+            // (no ring while verifying, no looping animation — user spec).
+            // Canvas because a Rectangle's border cannot take a gradient.
+            Canvas {
+                id: fieldRing
                 anchors.centerIn: parent
                 anchors.verticalCenterOffset: 160
-                width: 244
-                height: 54
-                radius: 27
-                visible: root.effState === "checking" || root.effState === "failed"
-                gradient: root.effState === "failed"
-                    ? failGrad : checkGrad
-                opacity: visible ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: 150 } }
+                width: 248
+                height: 58
+                visible: root.effState === "failed"
+                onPaint: {
+                    const ctx = getContext("2d");
+                    ctx.reset();
+                    ctx.lineWidth = 2;
+                    const grad = ctx.createLinearGradient(0, 0, 0, height);
+                    grad.addColorStop(0, String(Theme.urgent));
+                    grad.addColorStop(1, String(Theme.danger));
+                    ctx.strokeStyle = grad;
+                    const x = 1, y = 1, w = width - 2, h = height - 2, r = 27;
+                    ctx.beginPath();
+                    ctx.moveTo(x + r, y);
+                    ctx.lineTo(x + w - r, y);
+                    ctx.arcTo(x + w, y, x + w, y + r, r);
+                    ctx.lineTo(x + w, y + h - r);
+                    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+                    ctx.lineTo(x + r, y + h);
+                    ctx.arcTo(x, y + h, x, y + h - r, r);
+                    ctx.lineTo(x, y + r);
+                    ctx.arcTo(x, y, x + r, y, r);
+                    ctx.closePath();
+                    ctx.stroke();
+                }
+                // show once at full strength, then fade out
+                onVisibleChanged: {
+                    if (visible) {
+                        requestPaint();
+                        ringFade.restart();
+                    } else {
+                        opacity = 1; // re-arm for the next failure
+                    }
+                }
+                NumberAnimation {
+                    id: ringFade
+                    target: fieldRing
+                    property: "opacity"
+                    from: 1; to: 0
+                    duration: 1800
+                    easing.type: Easing.OutQuad
+                }
+                Component.onCompleted: requestPaint()
+                Connections {
+                    target: root
+                    function onEffStateChanged() { fieldRing.requestPaint(); }
+                }
             }
-            Gradient {
-                id: checkGrad
-                GradientStop { position: 0.0; color: Theme.accent }
-                GradientStop { position: 1.0; color: Theme.urgent }
-            }
-            Gradient {
-                id: failGrad
-                GradientStop { position: 0.0; color: Theme.urgent }
-                GradientStop { position: 1.0; color: Theme.danger }
-            }
-            // the field itself is invisible (hyprlock parity: transparent
-            // fill and outline) — only the dots show, blended into the
-            // wallpaper via their glow; the gradient ring appears on states
             Item {
                 id: field
-                visible: false
                 anchors.centerIn: parent
                 anchors.verticalCenterOffset: 160
                 width: 240
@@ -605,25 +645,25 @@ Item {
                 // indicator (hide_input) — exactly one is visible
                 Row {
                     anchors.centerIn: parent
-                    spacing: 9
+                    spacing: 7
                     visible: !root.hideInput && !root.asteriskDots
 
                     Repeater {
                         model: Math.min(root.effBuffer.length, 12)
                         Rectangle {
                             required property int index
-                            width: 8
-                            height: 8
-                            radius: 4
-                            color: Theme.fg
-                            opacity: 0.85
+                            width: 5
+                            height: 5
+                            radius: 2.5
+                            color: root.lockFg
+                            opacity: 0.9
                             // inputFieldDots parity: the newest dot breathes
                             SequentialAnimation on opacity {
                                 running: index === root.effBuffer.length - 1
                                 loops: Animation.Infinite
                                 alwaysRunToEnd: true
                                 NumberAnimation { to: 0.35; duration: 600 }
-                                NumberAnimation { to: 0.85; duration: 600 }
+                                NumberAnimation { to: 0.9; duration: 600 }
                             }
                         }
                     }
@@ -632,7 +672,7 @@ Item {
                     anchors.centerIn: parent
                     visible: root.asteriskDots && !root.hideInput
                     text: "*".repeat(Math.min(root.effBuffer.length, 12))
-                    color: Theme.fg
+                    color: root.lockFg
                     font.family: Theme.fontFamily
                     font.pixelSize: 24
                     font.letterSpacing: 6
@@ -642,124 +682,93 @@ Item {
                     visible: root.hideInput
                     name: "lock"
                     iconSize: 18
-                    iconColor: Theme.fg
+                    iconColor: root.lockFg
                 }
             }
-            Glow { source: field; shadowOpacity: 1.0; shadowBlur: 0.6 }
 
-            // sources visible:false; the EFFECT's visible is the real switch
-            // (a hidden source still renders through its MultiEffect)
             Text {
                 id: capsLabel
-                visible: false
+                visible: root.capsActive
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.top: field.bottom
-                anchors.topMargin: 10
+                anchors.topMargin: 12
                 text: "Caps Lock active"
                 color: Theme.urgent
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.textSize
+                font.pixelSize: 12
             }
-            Glow { source: capsLabel; visible: root.capsActive }
 
             Text {
                 id: failLabel
-                visible: false
+                visible: root.effState === "failed" || root.effState === "error"
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.top: capsLabel.bottom
-                anchors.topMargin: 10
-                text: root.failMessage !== "" ? root.failMessage : "Wrong password"
+                anchors.topMargin: 8
+                text: root.failMessage !== "" ? root.failMessage : "Authentication failed"
                 color: root.effState === "error" ? Theme.urgent : Theme.danger
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.textSize
-            }
-            Glow {
-                source: failLabel
-                visible: root.effState === "failed" || root.effState === "error"
+                font.pixelSize: 12
             }
 
-            // ── right column: battery [+ chip], weather, status ───────────
-            // each block anchors to the SCREEN edge directly (a Column +
-            // child right-anchors made the texts overflow off-screen); the
-            // sources are visible:false — their Glows render them
-            Item {
-                id: battBlock
-                visible: false
+            // ── right column: battery, weather, status ────────────────────
+            // each block anchors to the SCREEN edge directly with real gaps
+            // (the user rejected both the chip background and the clamped
+            // look). The old hyprlock "Battery-div" chip is kept commented:
+            // Rectangle { radius: 18; color: Theme.pillBg; border.width: 1;
+            //             border.color: Theme.border }  // behind the row
+            Row {
+                id: battRow
+                visible: root.battVisible
                 anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.rightMargin: 30
-                anchors.topMargin: 28
-                width: battRow.width + 28
-                height: battRow.height + 18
-
-                // Battery-div chip [hyprlock commented shape block] —
-                // comment out this Rectangle to keep a bare battery label
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 18
-                    color: Theme.pillBg
-                    border.width: 1
-                    border.color: Theme.border
+                anchors.rightMargin: 36
+                anchors.topMargin: 32
+                spacing: 7
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.batt ? Math.round(root.batt.percentage * 100) + "%" : ""
+                    color: root.lockFg
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 20
                 }
-                Row {
-                    id: battRow
-                    anchors.centerIn: parent
-                    spacing: 7
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: root.batt ? Math.round(root.batt.percentage * 100) + "%" : ""
-                        color: Theme.fg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 20
-                    }
-                    NIcon {
-                        anchors.verticalCenter: parent.verticalCenter
-                        name: root.battCharging ? "batteryCharging" : "battery"
-                        level: root.batt ? root.batt.percentage : 0
-                        iconSize: 22
-                        iconColor: Theme.fg
-                    }
+                NIcon {
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: root.battCharging ? "batteryCharging" : "battery"
+                    level: root.batt ? root.batt.percentage : 0
+                    iconSize: 22
+                    iconColor: root.lockFg
                 }
             }
-            Glow { source: battBlock; visible: root.battVisible }
 
             Text {
                 id: weatherLabel
-                visible: false
+                visible: root.weatherText !== ""
                 anchors.right: parent.right
-                anchors.top: battBlock.bottom
-                anchors.rightMargin: 30
-                anchors.topMargin: 12
+                anchors.top: battRow.bottom
+                anchors.rightMargin: 36
+                anchors.topMargin: 20
                 text: root.weatherText
-                color: Theme.fg
+                color: root.lockFg
                 font.family: Theme.fontFamily
                 font.pixelSize: 18
             }
-            Glow { source: weatherLabel; visible: root.weatherText !== "" }
 
             Text {
                 id: statusLabel
-                visible: false
                 anchors.right: parent.right
                 anchors.top: weatherLabel.bottom
-                anchors.rightMargin: 30
-                anchors.topMargin: 10
+                anchors.rightMargin: 36
+                anchors.topMargin: 14
                 text: root.statusText
-                color: Theme.fgMuted
+                color: root.lockFgMuted
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.textSize
+                font.pixelSize: 13
             }
-            Glow { source: statusLabel }
 
             // ── media widget [hyprlock commented media widget] ────────────
-            // no card background — it blends into the wallpaper; the whole
-            // row is an opacity:0 grab rendered by one Glow. opacity (not
-            // visible) keeps the transport buttons clickable per the Qt docs
-            // ("the source item is completely transparent, but still can
-            // receive touch or click input")
+            // no card background — it blends into the wallpaper
             Row {
                 id: mediaRow
-                opacity: 0
                 visible: root.mediaPlayer !== null
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.bottom: parent.bottom
@@ -781,7 +790,7 @@ Item {
                         visible: !parent.hasArt
                         name: "music"
                         iconSize: 40
-                        iconColor: Theme.fg
+                        iconColor: root.lockFg
                     }
                     Rectangle {
                         anchors.fill: parent
@@ -801,7 +810,7 @@ Item {
                         width: parent.width
                         text: root.mediaPlayer ? root.mediaPlayer.trackTitle : ""
                         elide: Text.ElideRight
-                        color: Theme.fg
+                        color: root.lockFg
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.textSize
                     }
@@ -809,7 +818,7 @@ Item {
                         width: parent.width
                         text: root.mediaPlayer ? root.mediaPlayer.trackArtists : ""
                         elide: Text.ElideRight
-                        color: Theme.fgMuted
+                        color: root.lockFgMuted
                         font.family: Theme.fontFamily
                         font.pixelSize: 13
                     }
@@ -833,7 +842,7 @@ Item {
                                     anchors.centerIn: parent
                                     name: mbtn.modelData.icon
                                     iconSize: mbtn.modelData.size
-                                    iconColor: Theme.fg
+                                    iconColor: root.lockFg
                                 }
                                 HoverHandler { id: mbtnHover; cursorShape: Qt.PointingHandCursor }
                                 TapHandler {
@@ -850,14 +859,12 @@ Item {
                     }
                 }
             }
-            Glow { source: mediaRow; visible: root.mediaPlayer !== null }
 
             // ── keyboard layout switcher [hyprlock commented $LAYOUT] ─────
-            // plain glowing text (no pill background); the opacity:0 grab
-            // keeps hover/click working while the Glow renders it
+            // plain text (no pill background)
             Item {
                 id: kbdArea
-                opacity: 0
+                visible: root.kbdLayout !== ""
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 anchors.rightMargin: 24
@@ -869,14 +876,13 @@ Item {
                     id: kbdLabel
                     anchors.centerIn: parent
                     text: root.kbdLayoutShort
-                    color: kbdHover.hovered ? Theme.urgent : Theme.fg
+                    color: kbdHover.hovered ? Theme.urgent : root.lockFg
                     font.family: Theme.fontFamily
                     font.pixelSize: 13
                 }
                 HoverHandler { id: kbdHover; cursorShape: Qt.PointingHandCursor }
                 TapHandler { onTapped: layoutSwitch.running = true }
             }
-            Glow { source: kbdArea; visible: root.kbdLayout !== "" }
 
             Text {
                 visible: root.testMode
@@ -885,7 +891,7 @@ Item {
                 anchors.leftMargin: 20
                 anchors.bottomMargin: 20
                 text: "lockscreen preview — type, Enter simulates a wrong password, Esc closes"
-                color: Theme.fgMuted
+                color: root.lockFgMuted
                 font.family: Theme.fontFamily
                 font.pixelSize: 12
             }
