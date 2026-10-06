@@ -40,7 +40,7 @@ relative imports (`import "../core"`).
 | `core/Popups.qml` (singleton) | `active` = name of the open popup ("" / "clock" / "wifi" / "bt" / "power" / "tray" / "wall"). Single source of truth for popup exclusivity. `lastDismiss` guards against the outside-click that dismissed a popup re-triggering a toggle. |
 | `popups/RicePopup.qml` | Base class for dash/wifi/bt/power popups: full-screen transparent layer-shell "shield", visible rounded panel anchored inside it, closes on outside click / `Esc` / `Popups.active` change. `panelWidth` + optional `panelHeight` (0 = auto-size from content); panel x is clamped to the screen. |
 | `popups/ClipboardPopup.qml` | Clipboard history panel (cliphist backend, rofi picker replacement): search + category chips, preview cards, decode-on-demand thumbnails, pin sidecar. See its section below. |
-| `standalone/Lockscreen.qml` | Session lock (hyprlock replacement): blurred awww wallpaper, 12h clock + date, PAM password dots, battery + weather + status (right column), MPRIS media card, keyboard-layout switcher. Lives in the main shell instance; engages via `LockState` / `qs-bar:lock` shortcut. See its section below. |
+| `standalone/Lockscreen.qml` | Session lock (hyprlock replacement): blurred awww wallpaper, 12h clock + date, PAM password dots, battery + weather + status (right column), MPRIS media card, keyboard-layout switcher. Lives in the main shell instance; engages via `LockState` / `qs:lock` shortcut. See its section below. |
 | `core/LockState.qml` (singleton) | `engaged` bool bridging lock triggers (PowerPopup's Lock action, future callers) to `Lockscreen.engage()`. Never set `engaged = false` to bypass auth — that's what TTY `loginctl unlock-session` is for. |
 | `popups/WifiPopup.qml` | Wi-Fi toggle, networks sorted by signal (connected first), max 5 visible + scroll, inline password prompt (`connectWithPsk`). |
 | `popups/BluetoothPopup.qml` | Adapter toggle, devices (paired first), pair/connect/disconnect on click. |
@@ -589,10 +589,16 @@ setting the knob). The unlock fade MUST run in QML before
 cannot be animated by compositor layer rules; keys are ignored while
 `unlocking`). The fades target a `uiFade` wrapper around the UI overlays
 ONLY — the wallpaper stays opaque so the surface's black backing never
-shows mid-fade (fading the whole content produced a black flash). Weather,
-status and the keyboard-layout switcher are commented out (user request,
-round 6) — their Processes at the root are commented with them; battery
-stays. TWO
+shows mid-fade (fading the whole content produced a black flash). Round 8
+attempted the "true" hyprlock cross-fade (transparent
+`WlSessionLockSurface.color` + wallpaper inside uiFade) — it looked perfect
+in preview but the user REJECTED it: on a real lock the black flash returns
+on enter AND exit. Hyprlock can cross-fade because it fully controls its
+own render pipeline; a Quickshell lock surface cannot replicate it. DO NOT
+retry — the split fade (opaque backing, overlays-only fade) is final.
+Weather, status and the keyboard-layout switcher are commented out (user
+request, round 6) — their Processes at the root are commented with them;
+battery stays. TWO
 lifecycle traps cost a debug round (user caught it: preview worked, real
 lock stayed palette-dark): (1) in the real bar the content is created with
 `wallpaperPath` ALREADY set, so an `onWallUrlChanged`-only trigger never
@@ -634,12 +640,21 @@ assigned when present.
 - **A `QtObject` root cannot host children** ("Cannot assign to
   non-existent default property") — Lockscreen's root is an invisible
   `Item`. Also: `id:` values cannot contain dots.
-- **Trigger wiring**: `qs-bar:lock` GlobalShortcut. From SCRIPTS (hypridle
+- **Trigger wiring**: `qs:lock` GlobalShortcut (appid `qs` — standalone
+  desktop tool, NOT `qs-bar`; renamed in round 8 when the lockscreen became
+  standalone). From SCRIPTS (hypridle
   lock_cmd) plain `hyprctl dispatch global ...` and `dispatch eval` both die
   in the Lua parser, but the bare **eval request works**:
-  `hyprctl eval 'hl.dsp.global("qs-bar:lock")'` → "ok" (verified). PowerPopup
+  `hyprctl eval 'hl.dsp.global("qs:lock")'` → "ok" (verified). PowerPopup
   Lock sets `LockState.engaged = true` (its `run()` takes the model entry;
   entries carry either `cmd` or `act: "lock"`).
+- **NEVER guard engage() on `LockState.engaged`** (round-8 lockout, user
+  caught it: the PowerPopup path set the flag first, so engage() — invoked
+  BY the flag change — returned immediately: lock surfaces with stale state
+  and a PAM that never started = complete lockout, no input accepted). The
+  guard is the lockscreen's own `sessionActive` flag; `LockState.engaged` is
+  only an external trigger mirror, and `WlSessionLock.locked` binds to
+  `sessionActive && !testMode`.
 - **PAM**: `PamContext` (`Quickshell.Services.Pam`) with `config: "login"` —
   literally the stack hyprlock gets (`/etc/pam.d/hyprlock` is just `auth
   include login`), so NO custom PAM file is needed (sudo unavailable in the
@@ -676,11 +691,11 @@ assigned when present.
   /tmp/cache/wttr_cache.txt'`). Started at `Component.onCompleted` AND on
   engage — the 60s timer alone missed the first minute.
 - **Commented-hyprlock-feature blocks** (user verifies, then comments out
-  themselves): profile photo (150px circular, `profilePhotoPath` → the repo
-  asset `assets/pfp.png`; STILL ACTIVE as of 2026-10-06 — the user will
-  comment it out once they confirm the round-7 fixes), weather, status line
-  (invented content: vol/mic/bt — original status.sh never existed; both it
-  and weather are commented out already), keyboard-layout
+  themselves): profile photo (130px circular, `profilePhotoPath` → the repo
+  asset `assets/pfp.png`; COMMENTED OUT in round 8 at the user's request,
+  nudged 30px toward the password field for when it returns), weather, status
+  line (invented content: vol/mic/bt — original status.sh never existed; both
+  it and weather are commented out already), keyboard-layout
   switcher (commented out too), MPRIS media card (art via `trackArtUrl`,
   only while PLAYING — widget-box-color.sh parity). The battery chip was
   REJECTED in round 3 —

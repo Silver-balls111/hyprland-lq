@@ -223,7 +223,7 @@ expose anchor properties, wire tooltips through `Bar.showTooltip()`.
   `IpcHandler` does not exist in 0.3.1 — GlobalShortcut is the only entry
   point.
 - Scripts cannot use `hyprctl dispatch global` (Lua parser rejects it) — the
-  bare eval request works: `hyprctl eval 'hl.dsp.global("qs-bar:lock")'`.
+  bare eval request works: `hyprctl eval 'hl.dsp.global("qs:lock")'`.
   That is what hypridle's `lock_cmd` uses.
 - The user's config is Lua; any dispatch strings generated for them must be
   valid Lua (`hl.dsp.*`).

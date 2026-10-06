@@ -14,10 +14,10 @@ import "../ui"
 
 // Session lock screen (hyprlock replacement). Lives inside the main shell
 // instance: the WlSessionLock stays unlocked until something engages it —
-//   · the "qs-bar:lock" GlobalShortcut (user binds e.g.
-//     hl.bind("SUPER + L", hl.dsp.global("qs-bar:lock")))
+//   · the "qs:lock" GlobalShortcut (user binds e.g.
+//     hl.bind("SUPER + L", hl.dsp.global("qs:lock")))
 //   · hypridle's lock_cmd, which can reach the same shortcut from a script
-//     via the Lua eval socket: hyprctl eval 'hl.dsp.global("qs-bar:lock")'
+//     via the Lua eval socket: hyprctl eval 'hl.dsp.global("qs:lock")'
 //     (plain `hyprctl dispatch global ...` dies in Hyprland >= 0.56's parser)
 //   · PowerPopup's Lock action, via the LockState singleton.
 //
@@ -148,8 +148,17 @@ Item {
     }
 
     // ── engage / unlock ────────────────────────────────────────────────────
+    // sessionActive is the lockscreen's OWN state; LockState.engaged is only
+    // the external trigger (PowerPopup etc.). NEVER guard on
+    // LockState.engaged: the PowerPopup path sets the flag FIRST, so engage()
+    // — invoked BY the flag change — would return immediately and lock the
+    // session with stale state and a PAM that never started (complete
+    // lockout — happened in round 8).
+    property bool sessionActive: false
+
     function engage() {
-        if (LockState.engaged) return;
+        if (sessionActive) return;
+        sessionActive = true;
         Popups.close();
         unlocking = false;
         buffer = "";
@@ -172,7 +181,7 @@ Item {
     }
 
     function unlock() {
-        if (!LockState.engaged || unlocking) return;
+        if (!sessionActive || unlocking) return;
         // fade the lock content out first; finishUnlock releases the session
         // once the surface is actually faded (hyprlock fadeOut parity)
         unlocking = true;
@@ -186,6 +195,7 @@ Item {
     }
 
     function finishUnlock() {
+        sessionActive = false;
         LockState.engaged = false;
         unlocking = false;
         buffer = "";
@@ -203,7 +213,7 @@ Item {
     }
 
     GlobalShortcut {
-        appid: "qs-bar"
+        appid: "qs" // standalone desktop tool (like wallpaper-switcher), not a bar feature
         name: "lock"
         description: "Lock the session (quickshell lockscreen)"
         onPressed: root.testMode ? (root.testWindowVisible = !root.testWindowVisible)
@@ -325,7 +335,7 @@ Item {
 
     // ── session lock (surface component instantiated per screen) ───────────
     WlSessionLock {
-        locked: LockState.engaged && !root.testMode
+        locked: root.sessionActive && !root.testMode
 
         WlSessionLockSurface {
             color: "#000000" // never leave the default white behind the wallpaper
@@ -624,18 +634,21 @@ Item {
             }
 
             // ── profile photo [hyprlock "Profile-Photo" block] ────────────
-            // points at the repo asset ../assets/pfp.png — replace that file
-            // to change the picture. (This block stays ACTIVE until the user
-            // confirms everything works, then gets commented out.)
+            // DISABLED by user (round 8) — uncomment to bring back. Points
+            // at the repo asset ../assets/pfp.png; nudged 30px toward the
+            // password field so the smaller photo doesn't leave a dead gap.
+            /*
             RoundedImage {
                 id: photo
                 anchors.centerIn: parent
+                anchors.verticalCenterOffset: 30
                 width: 130
                 height: 130
                 rounding: 65
                 visible: imgStatus === Image.Ready
                 source: root.profilePhotoPath
             }
+            */
 
             // ── password field ────────────────────────────────────────────
             // the field itself is invisible (hyprlock parity: transparent

@@ -57,7 +57,7 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
    hl.bind(mainMod .. " + N", hl.dsp.global("qs-bar:notification"))       -- dashboard
    hl.bind(mainMod .. " + W", hl.dsp.global("qs:wallpaper-switcher"))     -- wallpaper picker
    hl.bind(mainMod .. " + V", hl.dsp.global("qs:clipboard"))              -- clipboard panel
-   hl.bind("SUPER + L", hl.dsp.global("qs-bar:lock"))                     -- lock screen
+   hl.bind("SUPER + L", hl.dsp.global("qs:lock"))                     -- lock screen
    ```
    The OSD watches real device state, so volume/brightness keys need no helper
    scripts — call the tools directly (scripts from a swaync setup are fully
@@ -117,14 +117,14 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
 
 7. **Lock screen** (hyprlock replacement) — blurred current wallpaper, 12h
    clock + date, PAM password field, battery/weather/status and a media card.
-   It runs inside the bar instance and engages through the `qs-bar:lock`
+   It runs inside the bar instance and engages through the `qs:lock`
    shortcut (bind shown in step 3; the power menu's Lock action engages it
    too). Auth uses `/etc/pam.d/login` — the same PAM stack hyprlock's config
    includes — so no new PAM file is needed. For hypridle, scripts can't use
    `hyprctl dispatch global` (Lua parser), but the eval socket works — in
    `~/.config/hypr/hypridle.conf`:
    ```ini
-   lock_cmd = hyprctl eval 'hl.dsp.global("qs-bar:lock")'
+   lock_cmd = hyprctl eval 'hl.dsp.global("qs:lock")'
    ```
    (`loginctl lock-session` → hypridle → that command; re-fires are no-ops.)
    If the password is ever rejected with PAM broken: switch to a TTY
