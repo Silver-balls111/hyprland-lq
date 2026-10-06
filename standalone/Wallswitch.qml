@@ -259,32 +259,12 @@ PanelWindow {
         const now = Date.now();
         if (now - lastApply < 250) return;
         lastApply = now;
-        applyProc.path = walls[shown[selectedPos]];
-        applyProc.trans = transitions[Math.floor(Math.random() * transitions.length)];
-        applyProc.running = true;
+        // the runner lives in core/Actions.qml (persistent singleton): this
+        // popup is lazily created and destroyed on close, and a Process owned
+        // by it would die before the command completes
+        Actions.applyWallpaper(walls[shown[selectedPos]],
+            transitions[Math.floor(Math.random() * transitions.length)]);
         Popups.close();
-    }
-
-    Process {
-        id: applyProc
-        property string path: ""
-        property string trans: "fade"
-        // path/trans arrive as positional args — no quoting hazards
-        command: ["sh", "-c",
-            'awww img "$1" --transition-type "$2" --transition-duration 1.2 --transition-fps 60' +
-            ' && matugen image "$1" --prefer darkness --config "$HOME/.config/matugen/config.toml"',
-            "sh", path, trans]
-        stdout: StdioCollector {}
-        stderr: StdioCollector {
-            onStreamFinished: {
-                if (text.trim()) console.warn("wallswitch: apply stderr:", text.trim());
-            }
-        }
-        onExited: (code, status) => {
-            // awww failure short-circuits matugen, so the palette can never
-            // desync from the wallpaper
-            if (code !== 0) console.warn("wallswitch: apply failed, exit code", code);
-        }
     }
 
     // ---- slot recycling ----

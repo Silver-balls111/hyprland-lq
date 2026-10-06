@@ -214,8 +214,11 @@ RicePopup {
         if (thumbProc.running || !thumbQueue.length) return;
         const e = thumbQueue[0];
         thumbProc.outId = e.id;
+        // write to .part then mv: this panel is lazily destroyed on close —
+        // a Process killed mid-write must never leave a corrupt cache file
+        // behind (the Image would try to load the broken file forever)
         thumbProc.command = ["sh", "-c",
-            'mkdir -p "$(dirname "$2")" && cliphist decode "$1" > "$2"',
+            'mkdir -p "$(dirname "$2")" && cliphist decode "$1" > "$2.part" && mv "$2.part" "$2"',
             "sh", e.raw, thumbPath(e)];
         thumbProc.running = true;
     }
@@ -251,30 +254,16 @@ RicePopup {
     }
 
     // ---- actions ----
-    Process {
-        id: restoreProc
-        command: []
-        stderr: StdioCollector {
-            onStreamFinished: if (text.trim()) console.warn("clip: restore stderr:", text.trim())
-        }
-    }
-
+    // the runners live in core/Actions.qml (persistent singleton): this
+    // panel is lazily created and destroyed on close, and a Process owned
+    // by it would die before the command completes
     function restore(e) {
-        restoreProc.command = ["sh", "-c",
-            'printf "%s\\n" "$1" | cliphist decode | wl-copy', "sh", e.raw];
-        restoreProc.running = true;
+        Actions.restoreClipboard(e.raw);
         Popups.close();
     }
 
-    Process {
-        id: deleteProc
-        command: []
-    }
-
     function remove(e) {
-        deleteProc.command = ["sh", "-c",
-            'printf "%s\\n" "$1" | cliphist delete', "sh", e.raw];
-        deleteProc.running = true;
+        Actions.deleteClipboard(e.raw);
         entries = entries.filter(x => x.id !== e.id);
     }
 

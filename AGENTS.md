@@ -367,10 +367,11 @@ store` daemon — the daemon and cliphist db are never touched by the shell.
   `Popups.toggle("clip")` (own appid — like the wallpaper picker, it's a
   standalone desktop tool, not a bar feature; the user's bind is
   `hl.bind(mainMod .. " + V", hl.dsp.global("qs:clipboard"))`). The panel is
-  instantiated at shell root (NOT in Bar.qml) and centers itself on the
-  screen: `anchorX: screen.width/2` + `centerOnAnchor` +
-  `centerVertically` (a RicePopup option added for it). Size knobs: `panelW`
-  / `panelH` at the top of ClipboardPopup.qml.
+  instantiated at shell root via a lazy Loader (created on open, destroyed
+  on close — same as all popups) and centers itself on the screen:
+  `anchorX: screen.width/2` + `centerOnAnchor` + `centerVertically` (a
+  RicePopup option added for it). Size knobs: `panelW` / `panelH` at the top
+  of ClipboardPopup.qml.
 - **Data**: one `cliphist list` per open. Lines are `id\tpreview`
   (tab-separated); multi-line continuations don't match `^\d+\t` and are
   skipped. Categories: image when the preview starts with `[[ binary data `
@@ -733,12 +734,16 @@ directly).
   picker identifiable as a desktop tool rather than a bar feature). User
   binds e.g.
   `hl.bind(mainMod .. " + W", hl.dsp.global("qs:wallpaper-switcher"))`. The
-  window is instantiated once at shell root AFTER `Variants` — the
+  window is instantiated at shell root via a lazy Loader (created on open,
+  destroyed on close) declared AFTER `Variants` — the
   fullscreen shield is INVISIBLE (no dim; user rejected the dark backdrop:
   skwd floats over the live desktop) and must stack above the bar so a bar
   click closes the picker first, matching the other popups' convention.
-- **Apply = two binaries, exact known-good args**: one `sh -c` `Process`,
-  path/transition passed as positional argv (filename-proof):
+- **Apply = two binaries, exact known-good args**, executed by
+  `Actions.applyWallpaper(path, trans)` (core/Actions.qml — the runner MUST
+  live at singleton scope, see the lazy-popups Process rule): awww
+  + matugen as one `sh -c` with the path/transition passed as positional
+  argv (filename-proof):
   `awww img "$1" --transition-type "$2" --transition-duration 1.2
   --transition-fps 60 && matugen image "$1" --prefer darkness --config …`.
   `$2` is a random of fade/wipe/outer/grow/random. NB: the old rofi script's
@@ -904,6 +909,19 @@ Full numbers in [OPTIMIZATIONS.md](OPTIMIZATIONS.md); the load-bearing bits:
   mapped/unmapped, a re-shown surface sometimes never appeared at all
   (reproduced 2/14 opens, `hyprctl layers` shows NO surface). Fresh creation
   per open is deterministic; ~ms cost; churn plateaus (~105 KiB/cycle).
+- **A Process owned by a lazily destroyed popup dies with it.** The Loader
+  synchronously destroys the popup's whole object tree the moment
+  `Popups.active` clears — `apply()`/`restore()` started their command and
+  closed the popup in the same tick, killing awww/wl-copy before it ran
+  (both pickers "closed without applying" — the memory pass regression).
+  Rule: **fire-and-forget actions never live inside lazy popups** — they
+  live in `core/Actions.qml` (persistent singleton, Item root per the
+  ScreenTime precedent): `Actions.applyWallpaper(path, trans)`,
+  `Actions.restoreClipboard(raw)`, `Actions.deleteClipboard(raw)`. Processes
+  whose results are only consumed while the popup is open (list, expand,
+  thumbs, pins) stay in the popup — but the clipboard thumbnail decode now
+  writes to `<cache>.part` + `mv` (atomic), so a close-mid-decode can no
+  longer leave a corrupt cache file behind.
 - **glibc tuning on the launch line** (autostart.lua):
   `MALLOC_ARENA_MAX=2 MALLOC_TRIM_THRESHOLD_=8388608` — measured −32 MB and
   caps the RSS ratchet. Remove and RSS drifts back up.
