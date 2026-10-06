@@ -1,6 +1,8 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import Quickshell
+import "../core"
+import "../ui"
 
 RicePopup {
     id: root

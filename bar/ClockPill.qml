@@ -1,5 +1,7 @@
 import QtQuick
 import Quickshell
+import "../core"
+import "../ui"
 
 // Center pill: stateful bell + time. Bell mirrors waybar's notification-module
 // glyphs (none/notification/dnd variants); click opens the dashboard.

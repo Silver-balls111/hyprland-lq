@@ -1,4 +1,5 @@
 import QtQuick
+import "../core"
 
 // 4-bar signal strength indicator (strength: 0..100)
 Item {

@@ -3,6 +3,8 @@ import QtQuick.Layouts
 import QtQuick.Controls.Basic
 import Quickshell
 import Quickshell.Io
+import "../core"
+import "../ui"
 
 // Clipboard history panel — cliphist backend, rofi-picker replacement.
 // Data: one `cliphist list` per open (tab-separated `id\tpreview`, multi-line

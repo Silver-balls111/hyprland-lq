@@ -1,10 +1,12 @@
 # quickshell_rice
 
-> Agent/AI sessions: read **[AGENTS.md](AGENTS.md)** first — architecture, quirks and conventions.
+> Humans: start with **[developers.md](developers.md)** — architecture, conventions and workflows.
+> Agent/AI sessions: read **[AGENTS.md](AGENTS.md)** first — debugging history and gotchas.
 
-A floating pill bar for **Arch Linux + Hyprland ≥ 0.56**, built for **Quickshell 0.3.1**.
-Design: workspace pills (left) · stateful bell + clock (center) · status pill (right).
-Colors are not hardcoded — matugen recolors the whole bar live from the wallpaper
+A Quickshell desktop shell for **Arch Linux + Hyprland ≥ 0.56**, built for **Quickshell 0.3.1**.
+One process replaces waybar (the pill bar), swaync (notifications + dashboard), hyprlock
+(lock screen), wlogout (power menu) and three rofi pickers (wallpaper, clipboard, tray menus).
+Colors are not hardcoded — matugen recolors everything live from the wallpaper
 (pink is the fallback palette).
 
 > Hyprland 0.56 replaced the IPC dispatch syntax with Lua (`hl.dsp.*`). This bar
@@ -29,22 +31,22 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
 
 ## Setup in a fresh Hyprland session
 
-1. **Get the bar running**
+1. **Get the shell running**
    ```sh
    qs -p ~/Documents/Dev/quickshell_rice/shell.qml
    ```
-   or register it as a named config once, then use `qs -c topbar`:
+   or register it as a named config once, then use `qs -c rice`:
    ```sh
    mkdir -p ~/.config/quickshell
    ln -s ~/Documents/Dev/quickshell_rice ~/.config/quickshell/rice
-   qs -c topbar
+   qs -c rice
    ```
    Quickshell hot-reloads on every file save — tweaking QML needs no restart.
 
 2. **Autostart** — in `~/.config/hypr/config/autostart.lua` (replacing any
    swaync/waybar lines):
    ```lua
-   hl.exec_cmd("qs -c topbar")
+   hl.exec_cmd("qs -c rice")
    ```
 
 3. **Keybinds** — in `~/.config/hypr/config/keybinds.lua` (the bar registers
@@ -129,7 +131,7 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
    (Ctrl+Alt+F2) and run `loginctl unlock-session`. To preview without
    locking, run a throwaway instance that sets `testMode: true` (see
    AGENTS.md "Lock screen"); the widgets you don't want are self-contained
-   blocks at the bottom of `Lockscreen.qml` — comment them out like you did
+   blocks at the bottom of `standalone/Lockscreen.qml` — comment them out like you did
    in hyprlock.conf.
 
 ## Features
@@ -159,28 +161,43 @@ mic, wifi and bluetooth icons change with state exactly like waybar's
 popup is open): clicking anywhere outside the panel closes the popup, and
 clicking a bar pill toggles it directly. Clicks inside a panel never close it.
 
+## Repo layout
+
+```
+shell.qml        entry point (must stay at the repo root — qs -c loads it)
+colors.css       matugen output (generated; watched live — do not hand-edit)
+core/            singletons: Theme, Icons, Popups, Notifs, LockState, ScreenTime
+ui/              primitives: NIcon, Pill, Toggle, SignalBars, RoundedImage, TooltipWindow
+bar/             the bar + its feedback surfaces: Bar, Workspaces, ClockPill, StatusPill, Osd, Toast
+popups/          RicePopup panels: DashPopup (+ CalendarPanel, NotifsPanel, SystemUsage),
+                 WifiPopup, BluetoothPopup, PowerPopup, TrayMenuPopup, ClipboardPopup
+standalone/      fullscreen session-level surfaces: Wallswitch, Lockscreen
+assets/          pfp.png avatar (untracked — drop your own image here)
+shaders/         parked Wallswitch shader experiment (not used by live code)
+```
+
 ## Tweaking — which file controls what
 
 | File | Controls |
 |---|---|
-| `Theme.qml` | **Font family** (`fontFamily`, Rubik), **the single text size** (`textSize`, 14.5 — every non-icon text uses it), icon font (`nerdFont`), fallback palette colors, the matugen role → bar-color mapping (`applyPaletteCss`), metrics (`barHeight`, `pillHeight`, `popupRadius`) |
-| `Icons.qml` | Nerd Font glyph map (add glyphs here + a `yOffsets` entry if it sits off-center), battery icon sets |
+| `core/Theme.qml` | **Font family** (`fontFamily`, Rubik), **the single text size** (`textSize`, 14.5 — every non-icon text uses it), icon font (`nerdFont`), fallback palette colors, the matugen role → bar-color mapping (`applyPaletteCss`), metrics (`barHeight`, `pillHeight`, `popupRadius`) |
+| `core/Icons.qml` | Nerd Font glyph map (add glyphs here + a `yOffsets` entry if it sits off-center), battery icon sets |
 | `shell.qml` | Global shortcuts (`powermenu`, `notification`), palette file path (`FileView`), notification daemon capabilities, toast instantiation |
-| `Bar.qml` | Pill layout and popup anchoring |
-| `Workspaces.qml` | Minimum slots (`minCount`), idle/active widths, urgent tint |
-| `ClockPill.qml` | Bell states, time format, date tooltip |
-| `StatusPill.qml` | Tray, volume/mic scroll steps, wifi/bt/battery/power behavior and tooltips |
-| `DashPopup.qml` | Dashboard size (`panelWidth`, `panelHeight`) and column layout |
-| `CalendarPanel.qml` | Calendar rendering (grid, header, month nav) |
-| `NotifsPanel.qml` | Media card, notification rows (hover ✕), empty state, DND + Clear footer |
-| `Wallswitch.qml` | Wallpaper dir, slice geometry (height/width/gap/lean), dim + border, apply command |
-| `Notifs.qml` | History size cap (30), unread/DND logic, OSD-style handling |
-| `Toast.qml` | Toast width, position, per-urgency timings |
-| `RicePopup.qml` | Shared popup shell: anchoring/clamping, panel sizes, close behavior, click swallowing |
-| `WifiPopup.qml` / `BluetoothPopup.qml` | Per-popup list behavior, password prompt |
-| `PowerPopup.qml` | Power actions + commands |
-| `Lockscreen.qml` | Lock-screen widgets/geometry, knobs (`hideInput`, `asteriskDots`, `pamConfig`, `profilePhotoPath`), test overrides; comment out feature blocks here |
-| `LockState.qml` | The lock switch PowerPopup (or anything) sets to engage the lock |
-| `Popups.qml` | Which popup is open (exclusivity), outside-click toggle guard |
-| `TooltipWindow.qml` / `TrayMenuPopup.qml` | Tooltip rendering / tray menu theming |
-| `NIcon.qml` / `Toggle.qml` / `SignalBars.qml` / `Pill.qml` | Primitives: icon sizing, switches, signal bars, pill shape |
+| `bar/Bar.qml` | Pill layout and popup anchoring |
+| `bar/Workspaces.qml` | Minimum slots (`minCount`), idle/active widths, urgent tint |
+| `bar/ClockPill.qml` | Bell states, time format, date tooltip |
+| `bar/StatusPill.qml` | Tray, volume/mic scroll steps, wifi/bt/battery/power behavior and tooltips |
+| `popups/DashPopup.qml` | Dashboard size (`panelWidth`, `panelHeight`) and column layout |
+| `popups/CalendarPanel.qml` | Calendar rendering (grid, header, month nav) |
+| `popups/NotifsPanel.qml` | Media card, notification rows (hover ✕), empty state, DND + Clear footer |
+| `standalone/Wallswitch.qml` | Wallpaper dir, slice geometry (height/width/gap/lean), dim + border, apply command |
+| `core/Notifs.qml` | History size cap (30), unread/DND logic, OSD-style handling |
+| `bar/Toast.qml` | Toast width, position, per-urgency timings |
+| `popups/RicePopup.qml` | Shared popup shell: anchoring/clamping, panel sizes, close behavior, click swallowing |
+| `popups/WifiPopup.qml` / `popups/BluetoothPopup.qml` | Per-popup list behavior, password prompt |
+| `popups/PowerPopup.qml` | Power actions + commands |
+| `standalone/Lockscreen.qml` | Lock-screen widgets/geometry, knobs (`hideInput`, `asteriskDots`, `pamConfig`, `profilePhotoPath`), test overrides; comment out feature blocks here |
+| `core/LockState.qml` | The lock switch PowerPopup (or anything) sets to engage the lock |
+| `core/Popups.qml` | Which popup is open (exclusivity), outside-click toggle guard |
+| `ui/TooltipWindow.qml` / `popups/TrayMenuPopup.qml` | Tooltip rendering / tray menu theming |
+| `ui/NIcon.qml` / `ui/Toggle.qml` / `ui/SignalBars.qml` / `ui/Pill.qml` | Primitives: icon sizing, switches, signal bars, pill shape |

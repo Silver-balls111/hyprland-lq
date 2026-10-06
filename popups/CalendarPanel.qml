@@ -1,4 +1,6 @@
 import QtQuick
+import "../core"
+import "../ui"
 
 // Calendar column of the dashboard popup (DashPopup). Logic extracted verbatim
 // from the old CalendarPopup; DashPopup resets viewDate every time it opens.

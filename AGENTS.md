@@ -2,12 +2,14 @@
 
 Reference for AI agents / new sessions working on this repo. Read this before
 changing anything — most of it is the residue of real debugging sessions.
-`README.md` covers user-facing usage; this covers architecture, quirks and
+`README.md` covers user-facing usage, **[developers.md](developers.md)** is the
+human-developer guide (stable architecture + workflows); this file is the
+debugging-history companion, covering architecture, quirks and
 conventions.
 
 ## What this is
 
-A floating pill bar for **Arch Linux + Hyprland ≥ 0.56**, built for
+A Quickshell desktop shell for **Arch Linux + Hyprland ≥ 0.56**, built for
 **Quickshell 0.3.1** (QML). Layout: workspaces (left), clock + bell (center),
 tray/volume/mic/wifi/bluetooth/battery/power (right). Colors are not
 hardcoded — the palette is recolored live from the wallpaper via matugen
@@ -15,44 +17,53 @@ hardcoded — the palette is recolored live from the wallpaper via matugen
 user's waybar setup — `~/.config/waybar/config.jsonc` is the reference for
 Nerd Font glyph codepoints and per-state icon behavior.
 
-Run: `qs -p ~/Documents/Dev/quickshell_rice/shell.qml` (Quickshell hot-reloads
+Run: `qs -c rice` (named config — `~/.config/quickshell/rice` → this repo) or
+`qs -p ~/Documents/Dev/quickshell_rice/shell.qml` (Quickshell hot-reloads
 the config on every file save — you do not need to restart to test QML edits).
 
 ## File map
 
+2026-10-06: components are grouped by role — `core/` (singletons), `ui/`
+(primitives), `bar/` (bar + Osd + Toast), `popups/` (RicePopup panels +
+TrayMenuPopup), `standalone/` (Wallswitch, Lockscreen). Rows below carry their
+directory; bare file names elsewhere in this doc resolve via this map. Each
+directory has its own `qmldir`; cross-directory references use explicit
+relative imports (`import "../core"`).
+
 | File | Role |
 |---|---|
 | `shell.qml` | Entry point. `//@ pragma UseQApplication` is **required** (tray menus need it). Hosts the `GlobalShortcut`s (`powermenu` + `notification` under appid `qs-bar`, `wallpaper-switcher` under appid `qs`), the `NotificationServer` (once, NOT per-screen — see notification gotcha), the palette `FileView` (repo-local `colors.css`) and the `Toast`, `Osd` and `Wallswitch` windows. `Variants` spawns one `Bar` per screen (declared BEFORE `Wallswitch` so the picker's invisible input shield stacks above the bar). |
-| `Bar.qml` | 46px `PanelWindow` (layer Top). Anchors the three pills and instantiates the four `RicePopup`s + `TrayMenuPopup`. Also hosts `showTooltip()`/`hideTooltip()` which delegate to `TooltipWindow`. |
-| `Workspaces.qml` | Hyprland workspaces, min 5 persistent slots (`minCount`), click switches via dispatch. Urgent workspaces tint orange. Active cell is wider than idle/hover; first/last delegates draw "cap" circles so the active fill reaches the pill's rounded ends (see Workspaces gotcha). |
-| `ClockPill.qml` | Center pill: stateful bell + time (no clock glyph — removed 2026-10-04). Bell mirrors waybar's notification-module glyphs via `Notifs.unread`/`Notifs.dnd`; unread also boosts color from fgMuted to fg. Owns a `SystemClock`. Hover = date tooltip, click = dashboard popup. |
-| `StatusPill.qml` | Right pill: SystemTray items, volume (scroll ±1% / click mute), mic, wifi, bluetooth, battery, power. Exposes `wifiRightX`/`btRightX`/`powerRightX` so Bar can anchor popups under the right icons — **do not delete these**, the popups depend on them. |
-| `Popups.qml` (singleton) | `active` = name of the open popup ("" / "clock" / "wifi" / "bt" / "power" / "tray" / "wall"). Single source of truth for popup exclusivity. `lastDismiss` guards against the outside-click that dismissed a popup re-triggering a toggle. |
-| `RicePopup.qml` | Base class for dash/wifi/bt/power popups: full-screen transparent layer-shell "shield", visible rounded panel anchored inside it, closes on outside click / `Esc` / `Popups.active` change. `panelWidth` + optional `panelHeight` (0 = auto-size from content); panel x is clamped to the screen. |
-| `ClipboardPopup.qml` | Clipboard history panel (cliphist backend, rofi picker replacement): search + category chips, preview cards, decode-on-demand thumbnails, pin sidecar. See its section below. |
-| `Lockscreen.qml` | Session lock (hyprlock replacement): blurred awww wallpaper, 12h clock + date, PAM password dots, battery + weather + status (right column), MPRIS media card, keyboard-layout switcher. Lives in the main shell instance; engages via `LockState` / `qs-bar:lock` shortcut. See its section below. |
-| `LockState.qml` (singleton) | `engaged` bool bridging lock triggers (PowerPopup's Lock action, future callers) to `Lockscreen.engage()`. Never set `engaged = false` to bypass auth — that's what TTY `loginctl unlock-session` is for. |
-| `WifiPopup.qml` | Wi-Fi toggle, networks sorted by signal (connected first), max 5 visible + scroll, inline password prompt (`connectWithPsk`). |
-| `BluetoothPopup.qml` | Adapter toggle, devices (paired first), pair/connect/disconnect on click. |
-| `PowerPopup.qml` | Power Off / Reboot / Suspend / Log Out / Hibernate / Lock (6 rows, 5 visible + scroll). Commands + letter keybinds mirror `~/.config/wlogout/layout`; grabs exclusive keyboard while open (`grabKeys`). |
-| `DashPopup.qml` | Clock-click dashboard (replaces the old `CalendarPopup`): calendar column (left, 310px) + hairline divider + notifications column (right), fixed `panelHeight` 540 so a playing media card only takes space from the list. `popupName: "clock"`, anchored centered on the clock pill. Below the calendar sits the system-usage section (profile rows + CPU/mem/disk bars) — start()/stop() on open/close. |
-| `CalendarPanel.qml` | Month grid + weekday/date header, extracted verbatim from the old `CalendarPopup`; `resetMonth()` called by DashPopup on every open. Exposes `contentHeight` (actual month) and `maxContentHeight` (6-row worst case) — DashPopup sizes the panel to the former and reserves the latter, so the system-usage section below sits at a fixed y in every month. |
-| `SystemUsage.qml` | Profile/system section at the bottom of the dashboard's calendar column: fastfetch-style rows (distro from /etc/os-release, screen time, verbose uptime) next to the circular avatar (assets/pfp.png), then CPU (+ temp) / Memory / total-Disk bar rows. NO card background — blended into the popup. Quickshell 0.3.1 has no system-info service — everything is polled from `/proc` + `/sys` + `df` with FileView+Timer (see its section below). |
-| `RoundedImage.qml` | Rounded-corner image (avatar, lock-screen photo + album art). Originally a MultiEffect mask with an offscreen white item — that NEVER renders in layer-shell windows (see the system-usage section below); rewritten as a Canvas-drawn clip. Same API: `source`, `imgStatus`, `rounding`. |
-| `ScreenTime.qml` (singleton) | Cumulative "screen time today" accumulator (Android-style, resets at midnight). `IdleMonitor` (ext-idle-notify, 330s, inhibitors respected) mirrors the user's hypridle DPMS-off listener; persists to `~/.cache/quickshell_rice/screen-time` (`<yyyy-MM-dd> <seconds>` sidecar). Must run all day even when the dashboard is never opened → singleton, `init()` called from shell.qml `Component.onCompleted` (singletons are lazy — without that first touch NOTHING runs). |
-| `NotifsPanel.qml` | Right column of the dashboard: MPRIS player card(s) docked on top (`Mpris.players` filtered to non-stopped), notification history ListView, bell "No Notifications" empty state, footer with DND `Toggle` + `Clear`. History is a **ListModel mirrored from `Notifs.history`** (`syncHistory()`, keyed by the entry's stable `entryId`) — a plain-array model would reset the ListView on every change, wiping per-row expanded state and blocking per-item animations. Rows: click = expand/collapse the full wrapped body (grows DOWNWARD only — content is top-anchored; center-anchored made the row grow both ways, the "bouncy" effect); expanded state is a model role (`setProperty`), so removing one row keeps others expanded; ✕ removes with a swipe-out (`ListView.onRemove` + `delayRemove`); new rows slide in from the right; `Clear` resets instantly (no swipe storm). |
-| `Notifs.qml` (singleton) | Notification history (plain JS snapshots, capped 30, newest first), `dnd`, current `toast` entry, `push/remove/clearAll/closeToast`. `push` sets `n.tracked = true` — see notification gotcha. |
-| `Toast.qml` | Top-right toast banner (small mapped-only window, TooltipWindow pattern). Timer mirrors the user's old swaync timings: 2s low / 4s normal / 6s critical; app-supplied `expireTimeout` (ms) wins when > 0, clamped 2–15s. Hidden while DND or the dashboard is open. Click = expand/collapse the full body (timer PAUSES while expanded so it can't vanish mid-read); a small always-visible ✕ in the corner dismisses. Content is top-anchored so expansion grows downward. |
-| `Wallswitch.qml` | Slanted wallpaper picker (skwd-wall "Slices" look, right-leaning) floating over the live desktop — NO dim backdrop, invisible input shield. 9-slot recycled carousel (4 strips per side), type-to-search, preview-first UX; applies via the `awww` + `matugen` binaries directly — the rofi `wall-switcher.sh` is retired (see its section below). |
+| `bar/Bar.qml` | 46px `PanelWindow` (layer Top). Anchors the three pills and instantiates the four `RicePopup`s + `TrayMenuPopup`. Also hosts `showTooltip()`/`hideTooltip()` which delegate to `TooltipWindow`. |
+| `bar/Workspaces.qml` | Hyprland workspaces, min 5 persistent slots (`minCount`), click switches via dispatch. Urgent workspaces tint orange. Active cell is wider than idle/hover; first/last delegates draw "cap" circles so the active fill reaches the pill's rounded ends (see Workspaces gotcha). |
+| `bar/ClockPill.qml` | Center pill: stateful bell + time (no clock glyph — removed 2026-10-04). Bell mirrors waybar's notification-module glyphs via `Notifs.unread`/`Notifs.dnd`; unread also boosts color from fgMuted to fg. Owns a `SystemClock`. Hover = date tooltip, click = dashboard popup. |
+| `bar/StatusPill.qml` | Right pill: SystemTray items, volume (scroll ±1% / click mute), mic, wifi, bluetooth, battery, power. Exposes `wifiRightX`/`btRightX`/`powerRightX` so Bar can anchor popups under the right icons — **do not delete these**, the popups depend on them. |
+| `core/Popups.qml` (singleton) | `active` = name of the open popup ("" / "clock" / "wifi" / "bt" / "power" / "tray" / "wall"). Single source of truth for popup exclusivity. `lastDismiss` guards against the outside-click that dismissed a popup re-triggering a toggle. |
+| `popups/RicePopup.qml` | Base class for dash/wifi/bt/power popups: full-screen transparent layer-shell "shield", visible rounded panel anchored inside it, closes on outside click / `Esc` / `Popups.active` change. `panelWidth` + optional `panelHeight` (0 = auto-size from content); panel x is clamped to the screen. |
+| `popups/ClipboardPopup.qml` | Clipboard history panel (cliphist backend, rofi picker replacement): search + category chips, preview cards, decode-on-demand thumbnails, pin sidecar. See its section below. |
+| `standalone/Lockscreen.qml` | Session lock (hyprlock replacement): blurred awww wallpaper, 12h clock + date, PAM password dots, battery + weather + status (right column), MPRIS media card, keyboard-layout switcher. Lives in the main shell instance; engages via `LockState` / `qs-bar:lock` shortcut. See its section below. |
+| `core/LockState.qml` (singleton) | `engaged` bool bridging lock triggers (PowerPopup's Lock action, future callers) to `Lockscreen.engage()`. Never set `engaged = false` to bypass auth — that's what TTY `loginctl unlock-session` is for. |
+| `popups/WifiPopup.qml` | Wi-Fi toggle, networks sorted by signal (connected first), max 5 visible + scroll, inline password prompt (`connectWithPsk`). |
+| `popups/BluetoothPopup.qml` | Adapter toggle, devices (paired first), pair/connect/disconnect on click. |
+| `popups/PowerPopup.qml` | Power Off / Reboot / Suspend / Log Out / Hibernate / Lock (6 rows, 5 visible + scroll). Commands + letter keybinds mirror `~/.config/wlogout/layout`; grabs exclusive keyboard while open (`grabKeys`). |
+| `popups/DashPopup.qml` | Clock-click dashboard (replaces the old `CalendarPopup`): calendar column (left, 310px) + hairline divider + notifications column (right), fixed `panelHeight` 540 so a playing media card only takes space from the list. `popupName: "clock"`, anchored centered on the clock pill. Below the calendar sits the system-usage section (profile rows + CPU/mem/disk bars) — start()/stop() on open/close. |
+| `popups/CalendarPanel.qml` | Month grid + weekday/date header, extracted verbatim from the old `CalendarPopup`; `resetMonth()` called by DashPopup on every open. Exposes `contentHeight` (actual month) and `maxContentHeight` (6-row worst case) — DashPopup sizes the panel to the former and reserves the latter, so the system-usage section below sits at a fixed y in every month. |
+| `popups/SystemUsage.qml` | Profile/system section at the bottom of the dashboard's calendar column: fastfetch-style rows (distro from /etc/os-release, screen time, verbose uptime) next to the circular avatar (assets/pfp.png), then CPU (+ temp) / Memory / total-Disk bar rows. NO card background — blended into the popup. Quickshell 0.3.1 has no system-info service — everything is polled from `/proc` + `/sys` + `df` with FileView+Timer (see its section below). |
+| `ui/RoundedImage.qml` | Rounded-corner image (avatar, lock-screen photo + album art). Originally a MultiEffect mask with an offscreen white item — that NEVER renders in layer-shell windows (see the system-usage section below); rewritten as a Canvas-drawn clip. Same API: `source`, `imgStatus`, `rounding`. |
+| `core/ScreenTime.qml` (singleton) | Cumulative "screen time today" accumulator (Android-style, resets at midnight). `IdleMonitor` (ext-idle-notify, 330s, inhibitors respected) mirrors the user's hypridle DPMS-off listener; persists to `~/.cache/quickshell_rice/screen-time` (`<yyyy-MM-dd> <seconds>` sidecar). Must run all day even when the dashboard is never opened → singleton, `init()` called from shell.qml `Component.onCompleted` (singletons are lazy — without that first touch NOTHING runs). |
+| `popups/NotifsPanel.qml` | Right column of the dashboard: MPRIS player card(s) docked on top (`Mpris.players` filtered to non-stopped), notification history ListView, bell "No Notifications" empty state, footer with DND `Toggle` + `Clear`. History is a **ListModel mirrored from `Notifs.history`** (`syncHistory()`, keyed by the entry's stable `entryId`) — a plain-array model would reset the ListView on every change, wiping per-row expanded state and blocking per-item animations. Rows: click = expand/collapse the full wrapped body (grows DOWNWARD only — content is top-anchored; center-anchored made the row grow both ways, the "bouncy" effect); expanded state is a model role (`setProperty`), so removing one row keeps others expanded; ✕ removes with a swipe-out (`ListView.onRemove` + `delayRemove`); new rows slide in from the right; `Clear` resets instantly (no swipe storm). |
+| `core/Notifs.qml` (singleton) | Notification history (plain JS snapshots, capped 30, newest first), `dnd`, current `toast` entry, `push/remove/clearAll/closeToast`. `push` sets `n.tracked = true` — see notification gotcha. |
+| `bar/Toast.qml` | Top-right toast banner (small mapped-only window, TooltipWindow pattern). Timer mirrors the user's old swaync timings: 2s low / 4s normal / 6s critical; app-supplied `expireTimeout` (ms) wins when > 0, clamped 2–15s. Hidden while DND or the dashboard is open. Click = expand/collapse the full body (timer PAUSES while expanded so it can't vanish mid-read); a small always-visible ✕ in the corner dismisses. Content is top-anchored so expansion grows downward. |
+| `bar/Osd.qml` | Volume / mic / brightness OSD — service-driven (Pipewire + backlight poll), Overlay layer; NOT notification-driven (see its gotcha section). |
+| `standalone/Wallswitch.qml` | Slanted wallpaper picker (skwd-wall "Slices" look, right-leaning) floating over the live desktop — NO dim backdrop, invisible input shield. 9-slot recycled carousel (4 strips per side), type-to-search, preview-first UX; applies via the `awww` + `matugen` binaries directly — the rofi `wall-switcher.sh` is retired (see its section below). |
 | `shaders/` | Prebuilt `.qsb` shaders for Wallswitch's slot rendering (AA'd parallelogram mask). Sources kept alongside; recompile command in the wallpaper section. |
-| `TrayMenuPopup.qml` | Themed DBusMenu renderer for tray items (`QsMenuOpener`), one submenu drill-down level with a Back row. Scroll position resets on every open. |
-| `TooltipWindow.qml` | Small floating window rendering ONE hover tooltip; positioned via layer-shell margins. Only mapped while showing. |
-| `NIcon.qml` | Fixed-square `Text` rendering one Nerd Font glyph from `Icons`. |
-| `Icons.qml` (singleton) | Glyph codepoint map + `batteryGlyph(level, charging)` + per-glyph `yOffset()` vertical corrections. |
-| `Theme.qml` (singleton) | Fonts (`fontFamily` = Rubik for all text, `nerdFont` = JetBrains Mono Nerd Font Propo for glyphs), the single `textSize` token (14.5 — every non-icon Text uses it, nothing bold), metrics, and the palette: color properties with pink-rice defaults that `applyPaletteCss()` overlays from matugen (see palette gotcha). |
-| `Pill.qml` | Base rounded pill; declared children go into an inner Row. `rowX` exposed for popup anchoring. |
-| `SignalBars.qml`, `Toggle.qml` | Wifi signal bars, on/off switch (pure QML, no Controls styling). |
-| `qmldir` | **Every** component must be listed here (singletons + types) — see gotchas. |
+| `popups/TrayMenuPopup.qml` | Themed DBusMenu renderer for tray items (`QsMenuOpener`), one submenu drill-down level with a Back row. Scroll position resets on every open. |
+| `ui/TooltipWindow.qml` | Small floating window rendering ONE hover tooltip; positioned via layer-shell margins. Only mapped while showing. |
+| `ui/NIcon.qml` | Fixed-square `Text` rendering one Nerd Font glyph from `Icons`. |
+| `core/Icons.qml` (singleton) | Glyph codepoint map + `batteryGlyph(level, charging)` + per-glyph `yOffset()` vertical corrections. |
+| `core/Theme.qml` (singleton) | Fonts (`fontFamily` = Rubik for all text, `nerdFont` = JetBrains Mono Nerd Font Propo for glyphs), the single `textSize` token (14.5 — every non-icon Text uses it, nothing bold), metrics, and the palette: color properties with pink-rice defaults that `applyPaletteCss()` overlays from matugen (see palette gotcha). |
+| `ui/Pill.qml` | Base rounded pill; declared children go into an inner Row. `rowX` exposed for popup anchoring. |
+| `ui/SignalBars.qml`, `ui/Toggle.qml` | Wifi signal bars, on/off switch (pure QML, no Controls styling). |
+| `qmldir` (one per directory) | **Every** component must be listed here (singletons + types) — see gotchas. |
 
 ## Critical gotchas (each cost a debugging round — do not rediscover)
 
@@ -230,7 +241,7 @@ pill as the `yItem` so every tooltip sits at one height. Toast sits at
 - Layer namespaces: `quickshell:bar` / `quickshell:popup` / `quickshell:toast` /
   `quickshell:tooltip` (renamed away from "rice-*"; the user's
   `window-rules.lua` blur rule matches `quickshell:bar`). The named qs config
-  is `~/.config/quickshell/topbar` → `qs -c topbar`.
+  is `~/.config/quickshell/rice` → `qs -c rice`.
 - **`decoration active/inactive_opacity` does NOT apply to layer surfaces** —
   no layerrule needed for opacity, and `hl.layer_rule` has NO `opacity` field
   anyway ("unknown field 'opacity'" config error). Popup/toast/tooltip opacity
@@ -543,7 +554,7 @@ and the bar rows (`gap = (height − 66 − 3×28) / 3`, min 10).
   materialize" chase. `pgrep -x qs` / `ps -eo comm | grep qs` FIRST, and
   `hyprctl layers`, before debugging a "stale" instance. The instance had
   also stopped hot-reloading before it died (log frozen despite saves) —
-  a fresh `qs -c topbar` picked everything up instantly (also cleared
+  a fresh `qs -c rice` picked everything up instantly (also cleared
   `/run/user/1000/quickshell/vfs/*` first per the stale-cache gotcha).
 
 ### Lock screen (Lockscreen.qml, 2026-10-05)
@@ -664,7 +675,7 @@ assigned when present.
   their Lock visuals live in `common/panels/lock`, `PasswordChars.qml` shows
   their per-char Material shapes.
 - **Preview/testing (NEVER real-lock from the agent)**: `/tmp/locktest.qml`
-  (keep out of the repo) imports the repo via the `file:` URL, applies
+  (keep out of the repo) imports the repo via `file:` URLs to `core/` + `standalone/`, applies
   colors.css to Theme, and instantiates `Lockscreen { testMode: true }` —
   the same content renders in an Overlay `PanelWindow`
   (`quickshell:lockscreen-test`), Enter SIMULATES a wrong password (no PAM),
@@ -870,14 +881,18 @@ directly).
   with `magick`. Non-visual singletons/components can be probed with a throwaway
   QML file run the same way (keep test files out of this repo). **Kill throwaway
   instances when done** — a stray `qs -p shell.qml` from an old session survived
-  a day and pixel-overlapped the real `qs -c topbar` bar invisibly.
+  a day and pixel-overlapped the real `qs -c rice` bar invisibly.
 - Popup layout can be verified without clicking the bar: run a second
   throwaway `qs` instance from /tmp that imports the repo via
-  `import "file:/home/anuj/Documents/Dev/quickshell_rice"` (bare absolute
+  `import "file:/home/anuj/Documents/Dev/quickshell_rice/core"` +
+  `import "file:/home/anuj/Documents/Dev/quickshell_rice/popups"` (bare absolute
   paths are rejected — the file: URL is mandatory), flips
   `Popups.active = "<name>"` in `Component.onCompleted` (optionally seeding
   singleton state like `Notifs.history` first), then grim-crops the panel
-  region. Two instances coexist fine as long as the throwaway has no
+  region. (The qmlscanner may WARN "unresolvable import" for the file: URLs —
+  the QML engine resolves them fine; verified 2026-10-06. For Wallswitch or
+  Lockscreen tests also import the `standalone` dir.) Two instances coexist
+  fine as long as the throwaway has no
   `NotificationServer`.
 - If a newer Quickshell lands in Arch `extra` (>0.3.1), re-verify this config
   before assuming it still works — deprecation warnings are the first sign.

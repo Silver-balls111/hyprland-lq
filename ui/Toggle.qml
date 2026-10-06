@@ -1,4 +1,5 @@
 import QtQuick
+import "../core"
 
 Rectangle {
     id: root

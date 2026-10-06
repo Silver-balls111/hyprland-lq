@@ -3,6 +3,8 @@ import QtQuick.Controls.Basic
 import Quickshell
 import Quickshell.Widgets
 import Quickshell.Wayland
+import "../core"
+import "../ui"
 
 // Themed dropdown menu for a tray item, rendered from its DBusMenu via
 // QsMenuOpener so it follows the bar's color scheme. One level of submenu

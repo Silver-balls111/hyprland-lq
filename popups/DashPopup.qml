@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import "../core"
 
 // Clock-pill dashboard: calendar column (left) + notifications/media column
 // (right), separated by a hairline. Fixed panel height — a playing media card

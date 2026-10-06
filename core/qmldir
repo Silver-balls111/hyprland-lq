@@ -1,0 +1,6 @@
+singleton Theme 1.0 Theme.qml
+singleton Icons 1.0 Icons.qml
+singleton Popups 1.0 Popups.qml
+singleton Notifs 1.0 Notifs.qml
+singleton LockState 1.0 LockState.qml
+singleton ScreenTime 1.0 ScreenTime.qml

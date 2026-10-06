@@ -1,4 +1,5 @@
 import QtQuick
+import "../core"
 
 // Rounded "pill" container; declared children go into its inner row.
 Rectangle {

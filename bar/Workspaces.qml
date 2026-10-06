@@ -2,6 +2,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
+import "../core"
+import "../ui"
 
 // Always shows at least minCount slots; extra slots jump to (create) that workspace.
 Pill {

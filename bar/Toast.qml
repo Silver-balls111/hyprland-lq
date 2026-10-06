@@ -1,6 +1,8 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import "../core"
+import "../ui"
 
 // Toast stack — every notification shows its own banner at the top-right
 // (newest on top, older ones pushed down), each retiring when its own

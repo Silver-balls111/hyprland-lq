@@ -1,5 +1,7 @@
 import QtQuick
 import Quickshell.Io
+import "../core"
+import "../ui"
 
 // Profile section at the bottom of the dashboard's calendar column — a
 // fastfetch-style block (reference: user's screenshot): circular avatar left,
@@ -292,7 +294,7 @@ Item {
                 rounding: 28
                 // repo-relative (resolved against THIS file's dir) — the
                 // rice stays portable; replace assets/pfp.png to change it
-                source: Qt.resolvedUrl("assets/pfp.png")
+                source: Qt.resolvedUrl("../assets/pfp.png")
             }
 
             Column {

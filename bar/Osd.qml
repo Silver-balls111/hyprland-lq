@@ -3,6 +3,8 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Pipewire
 import Quickshell.Wayland
+import "../core"
+import "../ui"
 
 // On-screen display for volume / microphone / brightness — a visual port of
 // end-4's ii shell OsdValueIndicator, driven directly by the services (NOT by

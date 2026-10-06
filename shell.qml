@@ -4,6 +4,10 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Services.Notifications
+import "core"
+import "bar"
+import "popups"
+import "standalone"
 
 ShellRoot {
     // starts the screen-time accumulator (singleton — lazily created, so it

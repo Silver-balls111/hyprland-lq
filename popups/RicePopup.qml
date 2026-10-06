@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import "../core"
 
 // Dropdown popup: a full-screen transparent layer-shell window ("shield")
 // covering everything below the bar. Clicks on the shield background close it;

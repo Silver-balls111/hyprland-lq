@@ -6,6 +6,9 @@ import Quickshell.Services.UPower
 import Quickshell.Services.SystemTray
 import Quickshell.Bluetooth
 import Quickshell.Networking
+import "../core"
+import "../ui"
+import "../popups"
 
 // Right pill: system tray, volume, mic, wifi, bluetooth, battery, power.
 Pill {

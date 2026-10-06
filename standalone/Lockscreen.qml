@@ -9,6 +9,8 @@ import Quickshell.Services.UPower
 import Quickshell.Services.Mpris
 import Quickshell.Services.Pipewire
 import Quickshell.Bluetooth
+import "../core"
+import "../ui"
 
 // Session lock screen (hyprlock replacement). Lives inside the main shell
 // instance: the WlSessionLock stays unlocked until something engages it —
@@ -55,7 +57,7 @@ Item {
     // repo-relative (Qt.resolvedUrl anchors it to THIS file's location) so the
     // rice is portable — no ~/Pictures dependency; drop any square-ish image
     // at <repo>/assets/pfp.png to replace the placeholder
-    property string profilePhotoPath: Qt.resolvedUrl("assets/pfp.png")
+    property string profilePhotoPath: Qt.resolvedUrl("../assets/pfp.png")
     property string weatherScript: Quickshell.env("HOME") + "/.config/hypr/hyprlock/weather.sh"
 
     // ── test/preview overrides (throwaway instances set these) ────────────
@@ -488,7 +490,7 @@ Item {
                 anchors.fill: parent
                 anchors.margins: -64 // blur samples transparent padding at edges
                 //source: "file://" + root.wallpaperPath
-                source: Qt.resolvedUrl("assets/pfp.png")
+                source: Qt.resolvedUrl("../assets/pfp.png")
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 cache: true

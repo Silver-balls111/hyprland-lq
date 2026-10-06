@@ -1,4 +1,5 @@
 import QtQuick
+import "../core"
 
 // Icon rendered with the Nerd Font (glyphs from Icons.qml).
 // Fixed square box so all icons align vertically; per-glyph y offsets from

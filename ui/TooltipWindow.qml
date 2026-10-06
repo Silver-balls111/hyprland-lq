@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import "../core"
 
 // Small floating window that renders one hover tooltip below a bar pill.
 // Sized to the tooltip and only mapped while it is showing, so it never

@@ -1,6 +1,9 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import "../core"
+import "../ui"
+import "../popups"
 
 PanelWindow {
     id: bar

@@ -3,6 +3,8 @@ import QtQuick.Layouts
 import QtQuick.Controls.Basic
 import Quickshell
 import Quickshell.Services.Mpris
+import "../core"
+import "../ui"
 
 // Notifications column of the dashboard: MPRIS player card(s) docked on top,
 // notification history below (scrolls), DND + Clear footer. The media card only
