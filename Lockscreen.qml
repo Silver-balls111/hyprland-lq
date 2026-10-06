@@ -487,7 +487,8 @@ Item {
                 visible: false // rendered only through the blur MultiEffect
                 anchors.fill: parent
                 anchors.margins: -64 // blur samples transparent padding at edges
-                source: "file://" + root.wallpaperPath
+                //source: "file://" + root.wallpaperPath
+                source: Qt.resolvedUrl("assets/pfp.png")
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 cache: true

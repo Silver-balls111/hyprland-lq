@@ -272,9 +272,9 @@ Item {
 
             Rectangle {
                 id: pfpFallback
-                width: 56
-                height: 56
-                radius: 28
+                width: 70
+                height: 70
+                radius: 35
                 color: Theme.inputBg
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
@@ -297,7 +297,7 @@ Item {
 
             Column {
                 anchors.left: pfpFallback.right
-                anchors.leftMargin: 12
+                anchors.leftMargin: 24
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 5
