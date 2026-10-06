@@ -8,28 +8,30 @@ QtObject {
     readonly property real textSize: 14.5
 
     // ---- palette ----
-    // Defaults = the original pink rice. shell.qml watches the matugen-
-    // generated colors.css (the same file waybar consumed) and feeds it to
-    // applyPaletteCss(), so these switch with the wallpaper — live, via
-    // watchChanges. Derived tones below stay formulaic on top of the roles.
-    property color pillBg: Qt.rgba(0.973, 0.886, 0.925, 0.88)
-    property color pillHover: Qt.rgba(0.988, 0.925, 0.949, 0.95)
+    // Defaults = a snapshot of the CURRENT wallpaper's matugen palette (the
+    // dark scheme from colors.css) so the shell never flashes the fallback
+    // pink on start or if colors.css is missing. shell.qml watches
+    // colors.css and feeds it to applyPaletteCss(), so these still switch
+    // with the wallpaper — live, via watchChanges. Derived tones below stay
+    // formulaic on top of the roles.
+    property color pillBg: Qt.rgba(0.757, 0.776, 0.867, 0.88)      // secondary
+    property color pillHover: Qt.rgba(0.867, 0.886, 0.976, 0.95)   // secondary_fixed
     // opaque on purpose — popups must never go see-through (a compositor-side
     // layerrule pins opacity to 1 as well, see README layer rules)
-    property color popupBg: Qt.rgba(0.976, 0.898, 0.933, 1.0)
+    property color popupBg: Qt.rgba(0.757, 0.776, 0.867, 1.0)      // secondary
 
     // active workspace / highlights
-    property color accent: "#f7c2d1"
-    property color accentSoft: "#fad4de"
+    property color accent: "#dde2f9"        // secondary_fixed
+    property color accentSoft: Qt.rgba(0.867, 0.886, 0.976, 0.55)
     // workspace that requested attention
-    property color urgent: "#f5bf9c"
+    property color urgent: "#ffb4ab"        // error
 
     // text
-    property color fg: "#2b1526"
+    property color fg: "#2a3042"            // on_secondary
     readonly property color fgMuted: Qt.rgba(fg.r, fg.g, fg.b, 0.55)
 
     // danger accents (critical notifications, destructive rows)
-    property color danger: "#c4586e"
+    property color danger: "#93000a"        // error_container
 
     // misc sheens / overlays — deliberately fixed whites or fg-derived so they
     // work on any palette hue without their own matugen role

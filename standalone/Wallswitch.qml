@@ -485,11 +485,18 @@ PanelWindow {
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         cache: true
+                        // keep the previous wallpaper visible while the new
+                        // one decodes — a bare slot flashes the desktop
+                        // through as a black parallelogram
+                        retainWhileLoading: true
                         source: root.wallSource(slot.wallIdx)
-                        // decode cap: quantized so the continuous width morph
-                        // doesn't re-decode every frame
-                        sourceSize.width: Math.max(64, Math.ceil(width / 128) * 128)
-                        sourceSize.height: 0
+                        // decode at TWO FIXED role buckets, never the live
+                        // animated width: the pixmap cache keys on
+                        // (source, sourceSize), so a width-derived size
+                        // re-decoded on every animation step and a wallpaper
+                        // re-entering any strip slot was a fresh disk decode.
+                        // 2 cache entries per wallpaper, instant re-visits.
+                        sourceSize: slot.t < 0.5 ? Qt.size(1600, 900) : Qt.size(1024, 576)
                     }
 
                     // dim overlay (center is undimmed); hover brightens
