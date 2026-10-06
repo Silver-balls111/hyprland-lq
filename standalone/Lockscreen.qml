@@ -630,9 +630,9 @@ Item {
             RoundedImage {
                 id: photo
                 anchors.centerIn: parent
-                width: 150
-                height: 150
-                rounding: 75
+                width: 130
+                height: 130
+                rounding: 65
                 visible: imgStatus === Image.Ready
                 source: root.profilePhotoPath
             }
@@ -799,13 +799,13 @@ Item {
                     text: root.batt ? Math.round(root.batt.percentage * 100) + "%" : ""
                     color: root.lockFgMuted
                     font.family: Theme.fontFamily
-                    font.pixelSize: 20
+                    font.pixelSize: 30
                 }
                 NIcon {
                     anchors.verticalCenter: parent.verticalCenter
                     name: root.battCharging ? "batteryCharging" : "battery"
                     level: root.batt ? root.batt.percentage : 0
-                    iconSize: 22
+                    iconSize: 32
                     iconColor: root.lockFgMuted
                 }
             }

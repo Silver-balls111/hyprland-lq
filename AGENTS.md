@@ -34,7 +34,7 @@ relative imports (`import "../core"`).
 |---|---|
 | `shell.qml` | Entry point. `//@ pragma UseQApplication` is **required** (tray menus need it). Hosts the `GlobalShortcut`s (`powermenu` + `notification` under appid `qs-bar`, `wallpaper-switcher` under appid `qs`), the `NotificationServer` (once, NOT per-screen — see notification gotcha), the palette `FileView` (repo-local `colors.css`) and the `Toast`, `Osd` and `Wallswitch` windows. `Variants` spawns one `Bar` per screen (declared BEFORE `Wallswitch` so the picker's invisible input shield stacks above the bar). |
 | `bar/Bar.qml` | 46px `PanelWindow` (layer Top). Anchors the three pills and instantiates the four `RicePopup`s + `TrayMenuPopup`. Also hosts `showTooltip()`/`hideTooltip()` which delegate to `TooltipWindow`. |
-| `bar/Workspaces.qml` | Hyprland workspaces, min 5 persistent slots (`minCount`), click switches via dispatch. Urgent workspaces tint orange. Active cell is wider than idle/hover; first/last delegates draw "cap" circles so the active fill reaches the pill's rounded ends (see Workspaces gotcha). |
+| `bar/Workspaces.qml` | Hyprland workspaces, min 5 persistent slots (`minCount`), click switches via dispatch. Urgent workspaces tint orange. Active cell is wider than idle/hover; every cell (first/last included) fills number-sized — no edge caps. |
 | `bar/ClockPill.qml` | Center pill: stateful bell + time (no clock glyph — removed 2026-10-04). Bell mirrors waybar's notification-module glyphs via `Notifs.unread`/`Notifs.dnd`; unread also boosts color from fgMuted to fg. Owns a `SystemClock`. Hover = date tooltip, click = dashboard popup. |
 | `bar/StatusPill.qml` | Right pill: SystemTray items, volume (scroll ±1% / click mute), mic, wifi, bluetooth, battery, power. Exposes `wifiRightX`/`btRightX`/`powerRightX` so Bar can anchor popups under the right icons — **do not delete these**, the popups depend on them. |
 | `core/Popups.qml` (singleton) | `active` = name of the open popup ("" / "clock" / "wifi" / "bt" / "power" / "tray" / "wall"). Single source of truth for popup exclusivity. `lastDismiss` guards against the outside-click that dismissed a popup re-triggering a toggle. |
@@ -325,16 +325,13 @@ the time of writing — the user reviews commits themselves).
   root.wsValues[0].id`, `isLast: … === root.wsValues[root.wsValues.length-1].id`).
   `root` DOES resolve inside those delegates. Any future per-delegate
   "am I first/last" logic must follow this pattern, never `Repeater.count`.
-- **Edge caps:** the first/last delegate each own a 32×32 circle
-  (`radius: height/2`) positioned so its semicircle coincides exactly with the
-  pill's rounded cap (first: `x: -root.hpadding`; last:
-  `x: width - height + root.hpadding` — verified 0px over/underhang by pixel
-  scan). They exist because simply deleting the Pill's `hpadding` would drag
-  the HOVER fill to the pill ends too, and the user explicitly wants hover
-  number-sized. Caps light ONLY for the active workspace
-  (`opacity: isActive ? 1 : 0` + 130ms fade). An earlier `color.a > 0` gate
-  also lit them on hover/urgent — rejected by the user. Cap `color` binds to
-  the cell's color so it inherits the ColorAnimation for free.
+- **Edge caps REMOVED (2026-10-06, user request):** the first/last delegates
+  used to draw 32×32 "cap" circles so the active fill reached the pill's
+  rounded ends; the user wanted first/last to fill exactly like intermediate
+  cells, so the caps and their `isFirst`/`isLast` plumbing are gone. Every
+  cell now sits inside the Pill's `hpadding` and fills number-sized. (If ever
+  re-added: the cells CANNOT resolve a Repeater `id` — derive edge-ness from
+  `root.wsValues`, see the trap above.)
 - **Width contract (user-specified, matched against their waybar):** idle and
   hover share `max(34, label + 26)`; the ACTIVE cell is wider,
   `max(44, label + 36)`, animated 170ms OutCubic. Switching swaps the two

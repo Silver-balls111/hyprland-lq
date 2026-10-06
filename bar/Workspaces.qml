@@ -37,9 +37,9 @@ Pill {
         }
     }
 
-    // Hoisted so delegates can read the edge ids: a Repeater id is not
-    // resolvable from delegates created through the Pill's content alias
-    // (ReferenceError -> isLast silently false).
+    // Hoisted so the min-5 padding + sorting is computed in one place:
+    // delegates read `root.wsValues` (a Repeater id is not resolvable from
+    // delegates created through the Pill's content alias).
     readonly property var wsValues: {
         const real = [...Hyprland.workspaces.values].filter(w => w.id > 0);
         const byId = new Map(real.map(w => [w.id, w]));
@@ -58,8 +58,6 @@ Pill {
             id: wsCell
 
             required property var modelData
-            readonly property bool isFirst: modelData.id === root.wsValues[0].id
-            readonly property bool isLast: modelData.id === root.wsValues[root.wsValues.length - 1].id
             readonly property bool isActive: Hyprland.focusedWorkspace?.id === modelData.id
             readonly property bool isUrgent: modelData.urgent === true
             readonly property string label: {
@@ -82,33 +80,6 @@ Pill {
             color: isActive ? Theme.accent
                  : isUrgent ? Theme.urgent
                  : cellHover.hovered ? Theme.accentSoft : idleColor
-
-            // only the ACTIVE fill bleeds into the pill's hpadding so it
-            // reaches the pill's rounded cap; hover stays number-sized
-            Rectangle {
-                visible: wsCell.isFirst
-                opacity: wsCell.isActive ? 1 : 0
-                Behavior on opacity {
-                    NumberAnimation { duration: 130 }
-                }
-                x: -root.hpadding
-                width: wsCell.height
-                height: wsCell.height
-                radius: width / 2
-                color: wsCell.color
-            }
-            Rectangle {
-                visible: wsCell.isLast
-                opacity: wsCell.isActive ? 1 : 0
-                Behavior on opacity {
-                    NumberAnimation { duration: 130 }
-                }
-                x: wsCell.width - wsCell.height + root.hpadding
-                width: wsCell.height
-                height: wsCell.height
-                radius: width / 2
-                color: wsCell.color
-            }
 
             Behavior on color {
                 ColorAnimation { duration: 130 }
