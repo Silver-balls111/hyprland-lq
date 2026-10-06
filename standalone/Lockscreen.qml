@@ -52,7 +52,7 @@ Item {
     // lock is released (compositor-side layer rules can't animate a surface
     // that is already destroyed)
     property int lockFadeInMs: 600
-    property int lockFadeOutMs: 500
+    property int lockFadeOutMs: 700
     property bool unlocking: false
     // repo-relative (Qt.resolvedUrl anchors it to THIS file's location) so the
     // rice is portable — no ~/Pictures dependency; drop any square-ish image
@@ -489,8 +489,7 @@ Item {
                 visible: false // rendered only through the blur MultiEffect
                 anchors.fill: parent
                 anchors.margins: -64 // blur samples transparent padding at edges
-                //source: "file://" + root.wallpaperPath
-                source: Qt.resolvedUrl("../assets/pfp.png")
+                source: "file://" + root.wallpaperPath
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 cache: true
@@ -507,12 +506,15 @@ Item {
 
             // samples the wallpaper's average luminance once per load and
             // flips root.wallDark, which drives lockFg/lockFgMuted above.
-            // TWO lifecycle traps (both hit): getContext() needs the canvas
+            // THREE lifecycle traps (all hit): getContext() needs the canvas
             // to be `available`, which is false during construction (real
             // bar: content is created with the path already set → the
-            // sampled decode must wait for availability); and in preview
-            // the path arrives late, so the load must also trigger from
-            // onWallUrlChanged. `decodePending` joins the two async events.
+            // sampled decode must wait for availability); in preview the
+            // path arrives late, so the load must also trigger from
+            // onWallUrlChanged; and a sample taken BEFORE the decode finished
+            // reads all-transparent pixels, whose 0-luminance would classify
+            // the wallpaper as dark FOREVER (one-way to true) — hence the
+            // zero-coverage retry below.
             Canvas {
                 id: lumSampler
                 visible: false
@@ -521,8 +523,10 @@ Item {
                 readonly property string wallUrl: root.wallpaperPath !== ""
                     ? "file://" + root.wallpaperPath : ""
                 property bool decodePending: false
+                property int retries: 0
 
                 onWallUrlChanged: {
+                    retries = 0;
                     decodePending = false;
                     if (wallUrl !== "") loadImage(wallUrl);
                 }
@@ -530,7 +534,9 @@ Item {
                     if (wallUrl !== "") { decodePending = true; loadImage(wallUrl); }
                 }
                 onImageLoaded: sample()
-                onAvailableChanged: if (available && decodePending) sample()
+                // canvas became usable while the decode was still pending —
+                // re-issue the load so onImageLoaded fires with it
+                onAvailableChanged: if (available && decodePending) loadImage(wallUrl)
 
                 function sample() {
                     if (!available) { decodePending = true; return; }
@@ -540,11 +546,32 @@ Item {
                     ctx.clearRect(0, 0, width, height);
                     ctx.drawImage(wallUrl, 0, 0, width, height);
                     const d = ctx.getImageData(0, 0, width, height).data;
-                    let sum = 0;
-                    for (let i = 0; i < d.length; i += 4)
+                    let sum = 0, covered = 0;
+                    for (let i = 0; i < d.length; i += 4) {
                         sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+                        if (d[i + 3] !== 0) covered++;
+                    }
+                    if (covered === 0) {
+                        // nothing decoded into the canvas yet — retry a few
+                        // times; if the wallpaper is genuinely unloadable the
+                        // background is the black backing, so bright text
+                        // (wallDark = true) is the correct fallback anyway
+                        if (retries < 5) {
+                            retries++;
+                            retryTimer.restart();
+                        } else {
+                            root.wallDark = true;
+                            decodePending = false;
+                        }
+                        return;
+                    }
                     root.wallDark = sum / (d.length / 4) < 128;
                     decodePending = false;
+                }
+                Timer {
+                    id: retryTimer
+                    interval: 250
+                    onTriggered: lumSampler.sample()
                 }
             }
 
@@ -597,8 +624,9 @@ Item {
             }
 
             // ── profile photo [hyprlock "Profile-Photo" block] ────────────
-            // hidden until the image exists; point profilePhotoPath elsewhere
-            // or drop the file into ~/Pictures/wallpapers/ to show it
+            // points at the repo asset ../assets/pfp.png — replace that file
+            // to change the picture. (This block stays ACTIVE until the user
+            // confirms everything works, then gets commented out.)
             RoundedImage {
                 id: photo
                 anchors.centerIn: parent
@@ -607,16 +635,6 @@ Item {
                 rounding: 75
                 visible: imgStatus === Image.Ready
                 source: root.profilePhotoPath
-            }
-            Rectangle {
-                visible: photo.visible
-                anchors.centerIn: photo
-                width: photo.width
-                height: photo.height
-                radius: width / 2
-                color: "transparent"
-                border.width: 2
-                border.color: "#1b1d1f"
             }
 
             // ── password field ────────────────────────────────────────────

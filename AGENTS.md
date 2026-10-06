@@ -477,8 +477,8 @@ and the bar rows (`gap = (height − 66 − 3×28) / 3`, min 10).
   (`Qt.resolvedUrl("assets/pfp.png")` — anchors to the QML file's own dir, no
   `~/Pictures` dependency; replace the file to change it — placeholder is a
   magick-generated silhouette). The lock screen's `profilePhotoPath` points
-  at the SAME asset (was `~/Pictures/wallpapers/final_logo.png`, which never
-  existed). The distro row is parsed from `/etc/os-release` (PRETTY_NAME,
+  at the SAME asset (the old `~/Pictures/wallpapers/final_logo.png` never
+  existed and is gone for good). The distro row is parsed from `/etc/os-release` (PRETTY_NAME,
   fallback NAME, fallback "Linux") — never hardcode "Arch Linux".
 - **Quickshell 0.3.1 has NO CPU/RAM/temp/disk API.** `/usr/lib/qt6/qml/Quickshell/Services/`
   has no System module and no `CpuUsage`/`Memory` types exist in any qmltypes
@@ -607,6 +607,22 @@ for the `available` handshake and be retried (`decodePending` +
 probe (1s timer guarded on `Process.running`, plus an immediate re-probe
 on the CapsLock keypress in `handleKey`); the capsLock field is only
 assigned when present.
+- **Round-7 fixes (2026-10-06, dir-cleanup fallout)**: (1) the wallpaper
+  background Image had been rebound to `Qt.resolvedUrl("../assets/pfp.png")`
+  (a copy of the avatar's expression) with the real
+  `"file://" + wallpaperPath` commented above it — pfp-as-wallpaper; the
+  awww query + parse were never the problem, don't "fix" them. (2) The
+  sampler's failure modes were ONE-DIRECTIONAL: a sample taken before the
+  decode finished (or a failed load) reads all-transparent pixels whose
+  0-luminance classifies the wallpaper dark forever — `sample()` now counts
+  alpha≠0 coverage, retries via a 250ms Timer (5 cap, `loadImage` re-issued
+  on the `available` handshake), and falls back to `wallDark = true` when
+  exhausted (unloadable wallpaper = black backing = light text is right).
+  (3) Classification uses Rec.709 LUMA — a blue-saturated wallpaper can
+  show a bright channel-mean (~167) while its luma is ~105 → "dark" with
+  light text is CORRECT for it; check with
+  `magick <img> -resize 16x9! -format "%[fx:0.2126*r+0.7152*g+0.0722*b]"`,
+  not `%[fx:mean]`. The photo ring (border #1b1d1f) is gone entirely.
 
 - **0.3.1 API names**: `WlSessionLock` / `WlSessionLockSurface` in
   `Quickshell.Wayland` (NOT `SessionLock*` — those are newer). The surface
@@ -663,12 +679,14 @@ assigned when present.
   /tmp/cache/wttr_cache.txt'`). Started at `Component.onCompleted` AND on
   engage — the 60s timer alone missed the first minute.
 - **Commented-hyprlock-feature blocks** (user verifies, then comments out
-  themselves): profile photo (150px circular, `profilePhotoPath`
-  — `~/Pictures/wallpapers/final_logo.png` does NOT exist yet, the block
-  self-hides via Image status), weather, status line (invented
-  content: vol/mic/bt — original status.sh never existed), keyboard-layout
-  switcher, MPRIS media card (art via `trackArtUrl`, only while PLAYING —
-  widget-box-color.sh parity). The battery chip was REJECTED in round 3 —
+  themselves): profile photo (150px circular, `profilePhotoPath` → the repo
+  asset `assets/pfp.png`; STILL ACTIVE as of 2026-10-06 — the user will
+  comment it out once they confirm the round-7 fixes), weather, status line
+  (invented content: vol/mic/bt — original status.sh never existed; both it
+  and weather are commented out already), keyboard-layout
+  switcher (commented out too), MPRIS media card (art via `trackArtUrl`,
+  only while PLAYING — widget-box-color.sh parity). The battery chip was
+  REJECTED in round 3 —
   it survives only as a comment in the right column. hyprlock toggles are
   properties: `hideInput`, `asteriskDots`. Design reference the user pointed
   at: end-4/dots-hyprland `ii` quickshell module (lock/polkit folders) —
