@@ -124,7 +124,7 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
    `hyprctl dispatch global` (Lua parser), but the eval socket works — in
    `~/.config/hypr/hypridle.conf`:
    ```ini
-   lock_cmd = hyprctl eval 'hl.dsp.global("qs:lock")'
+   lock_cmd = hyprctl dispatch 'hl.dsp.global("qs:lock")'   # NOTE: dispatch, NOT eval — eval discards the descriptor (no-op)
    ```
    (`loginctl lock-session` → hypridle → that command; re-fires are no-ops.)
    If the password is ever rejected with PAM broken: switch to a TTY

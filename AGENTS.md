@@ -642,10 +642,14 @@ assigned when present.
   `Item`. Also: `id:` values cannot contain dots.
 - **Trigger wiring**: `qs:lock` GlobalShortcut (appid `qs` — standalone
   desktop tool, NOT `qs-bar`; renamed in round 8 when the lockscreen became
-  standalone). From SCRIPTS (hypridle
-  lock_cmd) plain `hyprctl dispatch global ...` and `dispatch eval` both die
-  in the Lua parser, but the bare **eval request works**:
-  `hyprctl eval 'hl.dsp.global("qs:lock")'` → "ok" (verified). PowerPopup
+  standalone). From SCRIPTS (hypridle lock_cmd) the ONLY working form is the
+  **dispatch request with the descriptor**:
+  `hyprctl dispatch 'hl.dsp.global("qs:lock")'`. TRAPS (both cost rounds):
+  plain `hyprctl dispatch global ...` / `dispatch eval` die in the Lua
+  parser, and `hyprctl eval 'hl.dsp.global(...)'` returns "ok" but is a
+  NO-OP — eval discards the descriptor, so the shortcut never fires (the
+  user's hypridle silently failed to lock on exactly this; verified by
+  popping the dashboard: eval 0 layers, dispatch 1 layer). PowerPopup
   Lock sets `LockState.engaged = true` (its `run()` takes the model entry;
   entries carry either `cmd` or `act: "lock"`).
 - **NEVER guard engage() on `LockState.engaged`** (round-8 lockout, user

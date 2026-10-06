@@ -17,8 +17,9 @@ import "../ui"
 //   · the "qs:lock" GlobalShortcut (user binds e.g.
 //     hl.bind("SUPER + L", hl.dsp.global("qs:lock")))
 //   · hypridle's lock_cmd, which can reach the same shortcut from a script
-//     via the Lua eval socket: hyprctl eval 'hl.dsp.global("qs:lock")'
-//     (plain `hyprctl dispatch global ...` dies in Hyprland >= 0.56's parser)
+//     via `hyprctl dispatch 'hl.dsp.global("qs:lock")'` — dispatch consumes
+//     the descriptor; `hyprctl eval '...'` returns "ok" but is a NO-OP, and
+//     plain `hyprctl dispatch global ...` dies in Hyprland >= 0.56's parser
 //   · PowerPopup's Lock action, via the LockState singleton.
 //
 // Unlocking ONLY happens through PAM (password; no fingerprint support in
@@ -499,7 +500,10 @@ Item {
                 visible: false // rendered only through the blur MultiEffect
                 anchors.fill: parent
                 anchors.margins: -64 // blur samples transparent padding at edges
-                source: "file://" + root.wallpaperPath
+                // empty path (content created before the awww query lands)
+                // must NOT become "file:///" — that logs "Path is a directory"
+                // and attempts a bogus load every lock
+                source: root.wallpaperPath !== "" ? "file://" + root.wallpaperPath : ""
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 cache: true
