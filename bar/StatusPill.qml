@@ -140,12 +140,16 @@ Pill {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: mouse => {
                     if (trayBox.modelData.hasMenu) {
-                        if (Popups.active === "tray" && trayMenu.menuHandle === trayBox.modelData.menu) {
+                        if (Popups.active === "tray" && trayMenuLoader.item
+                            && trayMenuLoader.item.menuHandle === trayBox.modelData.menu) {
                             Popups.close(); // re-click the same icon closes its menu
                         } else {
-                            trayMenu.openFor(trayBox.modelData.menu,
-                                             root.x + root.rowX + trayBox.x + trayBox.width);
+                            // active first, then position: the Loader creates
+                            // the popup synchronously, and openFor() runs
+                            // before the async map completes
                             Popups.active = "tray"; // closes any other open popup
+                            trayMenuLoader.item.openFor(trayBox.modelData.menu,
+                                             root.x + root.rowX + trayBox.x + trayBox.width);
                         }
                     } else {
                         trayBox.modelData.activate();
@@ -156,9 +160,13 @@ Pill {
         }
     }
 
-    TrayMenuPopup {
-        id: trayMenu
-        barWindow: root.barWindow
+    // created on demand, destroyed on close (same rationale as Bar's popups)
+    Loader {
+        id: trayMenuLoader
+        active: Popups.active === "tray"
+        sourceComponent: TrayMenuPopup {
+            barWindow: root.barWindow
+        }
     }
 
     // ── volume ──

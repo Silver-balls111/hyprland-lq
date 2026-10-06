@@ -60,26 +60,48 @@ PanelWindow {
             barWindow: bar
         }
 
-        DashPopup {
-            clock: clockPill.clock
-            barWindow: bar
-            anchorX: clockPill.x + clockPill.width / 2
-            centerOnAnchor: true
+        // Popups are created on demand and DESTROYED on close: an idle shell
+        // carries no popup trees, and every open is a fresh window created
+        // mid-open — RicePopup syncs initial visibility from Popups.active in
+        // Component.onCompleted, so this is deterministic. Keep-forever +
+        // remap was tried first and is FLAKY: after several other popup
+        // windows had mapped/unmapped, a remapped surface sometimes never
+        // appeared at all (hyprctl layers showed nothing; hit live 2/14
+        // opens). Fresh creation avoids the remap path entirely; the
+        // re-instantiation cost is ~ms (the engine caches compiled
+        // components) and idle memory returns to zero on close.
+        Loader {
+            active: Popups.active === "clock"
+            sourceComponent: DashPopup {
+                clock: clockPill.clock
+                barWindow: bar
+                anchorX: clockPill.x + clockPill.width / 2
+                centerOnAnchor: true
+            }
         }
 
-        WifiPopup {
-            barWindow: bar
-            anchorX: statusPill.x + statusPill.wifiRightX
+        Loader {
+            active: Popups.active === "wifi"
+            sourceComponent: WifiPopup {
+                barWindow: bar
+                anchorX: statusPill.x + statusPill.wifiRightX
+            }
         }
 
-        BluetoothPopup {
-            barWindow: bar
-            anchorX: statusPill.x + statusPill.btRightX
+        Loader {
+            active: Popups.active === "bt"
+            sourceComponent: BluetoothPopup {
+                barWindow: bar
+                anchorX: statusPill.x + statusPill.btRightX
+            }
         }
 
-        PowerPopup {
-            barWindow: bar
-            anchorX: statusPill.x + statusPill.powerRightX
+        Loader {
+            active: Popups.active === "power"
+            sourceComponent: PowerPopup {
+                barWindow: bar
+                anchorX: statusPill.x + statusPill.powerRightX
+            }
         }
     }
 }

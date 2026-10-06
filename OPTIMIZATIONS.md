@@ -1,93 +1,93 @@
-# OPTIMIZATIONS.md — memory plan (next step after the dir cleanup)
+# OPTIMIZATIONS.md — memory pass, executed 2026-10-06 (optimization branch)
 
-Status: **plan only, not yet executed.** The restructure (2026-10-06) is done
-and verified; this file is the backlog for the follow-up performance pass.
+Status: **executed.** This file is now the record of what was measured, what
+was ruled out, and what changed. Re-measure before touching anything below.
 
-## Measured baseline (2026-10-06)
+## Headline numbers
 
-| Measurement | Value |
-|---|---|
-| Idle RSS, fresh instance (`qs -c rice`, ~4 min uptime) | **~380 MB** (`ps -C qs -o rss=` → 389 064 KB) |
-| Idle RSS, long-lived instance (pre-restructure) | ~423 MB, user reports up to **480 MB** |
-| Surfaces at idle | 1 quickshell layer group (bar); toast/OSD/tooltip unmapped by design |
-| Session | single 1920×1080 output; current wallpaper 2048×1228 (≈10 MB decoded RGBA) |
+| Measurement | Before | After |
+|---|---|---|
+| Fresh idle RSS (`qs -c rice`, everything closed) | ~380 MB | **~322 MB** |
+| Used instance after real interaction | ~495 MB within ~15 min of use | capped by glibc env, expect ~330–360 |
+| Empty-config engine floor (`ShellRoot {}` alone) | — | **212 MB** (stable plateau over 10 min) |
+| Idle surfaces | 1 layer group (bar) | 1 layer group (bar) |
 
-A Qt Quick + QML config of this complexity should idle far below this — the
- Quickshell/QML engine floor is typically well under 200 MB. Something in the
- config allocates heavily and/or retains decoded images.
+**The floor is the story**: an *empty* Quickshell 0.3.1 config idles at
+212 MB on this machine (Qt + QApplication + Mesa/LLVM mappings + QML engine).
+No QML-side work can go below that. Of the old ~380 MB fresh, ~170 MB was
+config; this pass removed ~58 MB of it and capped the growth ratchet.
 
-**Leak vs steady-state first**: an idle RSS that *grows* over hours is a leak
-(unretained image/pixmap cache, notification history, clipboard thumbs); a
-flat high plateau is eager allocation at startup. Measure before fixing.
+## What was measured (Phase 0 + suspect tests — all numbers reproducible)
 
-## Phase 0 — profiling methodology (do this first, no code changes)
+- Process composition (smaps): ~285 MB of the old 506 MB was private-dirty
+  anonymous heap (CPU-side: JS, QML trees, decoded-QImage pixmap cache,
+  Canvas surfaces); ~115 MB was shared Mesa/LLVM mappings. Renderer is the
+  threaded GL scene graph (AMD iGPU) — GPU textures do NOT show up in RSS.
+- **Engine floor**: `ShellRoot {}` → 212 MB, flat over 10 min. Every
+  measurement above the floor is config cost.
+- **Wallswitch browsing does NOT accumulate** — 120 centered wallpapers in a
+  throwaway: RSS **−29 MB** (Qt's pixmap cache purges unreferenced entries
+  fine, even with `cache: true` on the slot Images).
+- **Notification history does NOT accumulate** — `Notifs.push` snapshots
+  scalar fields only; no hint/image payloads retained; live `Notification`
+  wrappers dropped when their toast ends.
+- **Lockscreen does NOT retain memory after unlock** — the wallpaper Image +
+  blur MultiEffect live inside a Loader that is a child of
+  `WlSessionLockSurface`; the surface is destroyed on unlock and takes the
+  whole content tree with it. (At most one ~10 MB wallpaper pixmap lingers
+  in Qt's trimmable pixmap cache.)
+- **OSD FileView poll churn is free** — 2000 `FileView.reload()` calls at
+  40 ms: RSS flat (±0). The 400 ms brightness poll costs nothing.
+- **Popup open/close cycles plateau, not leak** — eager build: +26 MB over
+  the first ~50 cycles (engine warm-up: glyph caches, JS caches), then flat
+  (~76 KiB/cycle average over 250).
 
-```sh
-# RSS-over-time curve (run in background, ~1 h)
-while :; do printf '%s %s\n' "$(date +%T)" "$(ps -o rss= -C qs)"; sleep 30; done
-```
+## What changed
 
-1. **Idle curve** — fresh `qs -c rice`, record RSS every 30 s for 30–60 min
-   with zero interaction. Flat plateau → startup eager-allocation problem;
-   upward slope → retention problem.
-2. **Feature deltas** — measure RSS before/after exercising each feature
-   ~20×: open/close dashboard, clipboard panel, wallpaper picker (scroll
-   through ~100 entries!), lock/unlock (testMode or a real short lock),
-   tray menus, image notifications. The biggest delta names the culprit.
-3. **Per-surface accounting** — `hyprctl layers` before/after each test;
-   count mapped surfaces × full-screen buffer size (1920×1080×4 ≈ 8 MB per
-   buffer, ×2–3 for swapchains) to see how much is window overhead vs image
-   data.
-4. Optional deep dive if RSS stays mysterious: `heaptrack qs -c rice`
-   (package `heaptrack`) or `valgrind --tool=massif` — heavy, only after the
-   cheap curves point somewhere.
+1. **Popups are created on demand and destroyed on close**
+   (`bar/Bar.qml` ×4, `bar/StatusPill.qml` tray menu, `shell.qml`
+   Wallswitch + ClipboardPopup — plain `Loader { active: Popups.active ===
+   "name" }`). An idle shell now carries zero popup trees, and close returns
+   that memory. Two designs were tried first and REJECTED — don't retry:
+   - *Latch Loader* (`active: everOpened || Popups.active === name` +
+     write-back in `onActiveChanged`) → **QML binding loop** ("Binding loop
+     detected for property active") — the write re-enters the binding's own
+     dependency set.
+   - *Imperative latch* (`active: false`, set true from a Connections) → no
+     loop, but the kept window's **remap is flaky**: after several other
+     popup windows had mapped/unmapped, a re-shown surface sometimes never
+     appeared at all (reproduced 2/14 opens; `hyprctl layers` showed NO
+     surface). Fresh creation has never failed (dozens of opens) because it
+     always takes the first-map path — RicePopup/TrayMenuPopup/Wallswitch
+     all sync initial visibility from `Popups.active` in their
+     `Component.onCompleted`.
+   Cost: re-instantiation per open (~ms; the engine caches compiled
+   components) and a churn plateau slightly above remap's (~105 vs
+   ~76 KiB/cycle average, warm-up-dominated, measured over 250 cycles).
+   Verified: full popup tour ×2 with pixel scans — every open rendered.
+2. **glibc allocator tuning** in `~/.config/hypr/config/autostart.lua`:
+   `MALLOC_ARENA_MAX=2 MALLOC_TRIM_THRESHOLD_=8388608` on the `qs` launch
+   line. Measured −32 MB on the identical config (383 → 351) and it caps the
+   RSS ratchet (glibc otherwise keeps freed heap per-arena).
+3. **`imageSupported: false`** in shell.qml's NotificationServer — nothing
+   in the shell renders notification images, so advertising support only
+   made apps ship raw image payloads for nothing.
 
-## Suspects, ranked (hypotheses — verify each before fixing)
+## Suspects tested and CLEARED (do not re-chase)
 
-1. **Lockscreen wallpaper retained after unlock** — *verified*: no lock
-   surface is mapped while unlocked, so the wallpaper does NOT decode at
-   boot. (The `Component.onCompleted` load trigger in `Lockscreen.qml`
-   exists because the surface is created with `wallpaperPath` already set —
-   an `onWallUrlChanged`-only trigger would never fire; that is a load
-   trigger, not a boot-time decode.) The open question is the opposite:
-   whether the decoded wallpaper + blur FBOs are **released** when the
-   surface is destroyed on unlock. *Test: RSS before engage vs right after
-   unlock; if a permanent ~10–30 MB step remains (current wallpaper
-   2048×1228 ≈ 10 MB decoded), null the Image source and the MultiEffect
-   source on the unlock path.*
-2. **Lockscreen `MultiEffect` blur chain** — full-screen blur allocates
-   FBOs at surface size while the lock surface exists. Verify the chain is
-   released on unlock (surface destroyed ⇒ buffers freed — confirm with the
-   RSS curve across a lock/unlock cycle). If retained, null the effect
-   source on unlock.
-3. **Wallswitch image cache growth** — slot images use `cache: true` with
-   decode width quantized to 128 px steps (good), but browsing hundreds of
-   wallpapers accumulates decoded pixmaps in the Qt image cache. *Test:
-   RSS before/after scrolling ~100 entries. Fix candidates: `cache: false`
-   on slot images (quantization already amortizes decode cost) or a bounded
-   cache.*
-4. **Fullscreen shield windows** — RicePopup architecture means ~7
-   full-screen layer surfaces exist (4 popups + clipboard + wallswitch +
-   lock). Confirm unmapped ones hold no buffers (they should — windows are
-   mapped on demand); if any buffer persists while hidden, that is worth a
-   Quickshell issue, not a config workaround.
-5. **Notification history images** — `imageSupported: true` and history
-   snapshots are plain JS data; check whether image payloads are retained in
-   the 30-entry history (they should not be — strip to a thumbnail or drop
-   the payload on push).
-6. **Clipboard expanded text** — already capped at 64 KB per decode; low
-   priority.
-7. **Engine floor** — whatever remains after the above is the Quickshell/QML
-   baseline; document it as the floor rather than chasing it.
+Wallswitch `cache: true` growth · Notifs image payloads · lockscreen
+post-unlock retention · OSD FileView churn · fullscreen shields at idle
+(unmapped windows hold no buffers — 1 layer group at idle) · notification
+history size.
 
-## Ground rules for the optimization pass
+## Revised target & remaining levers
 
-- Fix one suspect at a time, re-run the Phase 0 curve after each — attribute
-  wins to measurements, not vibes.
-- Never restart/kill `qs` while the session lock is engaged (bricks the
-  session; recovery is TTY + `loginctl unlock-session`).
-- The popup architecture is deliberate — do not "optimize" it away.
-- Update this file as items land (strike them, keep the measured delta), and
-  mirror anything load-bearing into AGENTS.md.
-
-**Target**: idle RSS < 200 MB, no growth over a 24 h idle curve.
+- Realistic floor: **~322 MB fresh idle** (212 engine + ~110 config). The
+  old "< 200 MB" target is impossible on Quickshell 0.3.1 — an empty config
+  already costs 212.
+- Watch the idle curve (`while :; do printf '%s %s\n' "$(date +%T)"
+  "$(ps -o rss= -C qs)"; sleep 30; done`): with the env caps, growth should
+  plateau; a steady climb beyond ~400 MB with zero interaction would be a
+  new leak worth a heaptrack session.
+- If further wins are ever needed, the next lever is shrinking the config
+  side of the ~110 MB (smaller at-open trees), not the engine floor.

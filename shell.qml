@@ -68,7 +68,10 @@ ShellRoot {
         bodyImagesSupported: false
         actionsSupported: true
         actionIconsSupported: false
-        imageSupported: true
+        // images are never rendered (toasts/history are text-only) — do not
+        // advertise support, or apps start shipping raw image payloads in
+        // every notification for nothing
+        imageSupported: false
         persistenceSupported: true
 
         onNotification: notification => Notifs.push(notification)
@@ -107,13 +110,22 @@ ShellRoot {
         }
     }
 
-    // slanted wallpaper picker (single instance, default screen). Declared
-    // AFTER the bar so its (invisible) input shield stacks above the bar,
-    // same as the other popups: clicking a pill closes the picker first.
-    Wallswitch {}
+    // slanted wallpaper picker (single instance, default screen). Created on
+    // demand, destroyed on close (same rationale as Bar's popups — a kept
+    // window's remap is flaky, fresh creation is not). Declared AFTER the
+    // bar so its (invisible) input shield stacks above the bar, same as the
+    // other popups: clicking a pill closes the picker first.
+    Loader {
+        active: Popups.active === "wall"
+        sourceComponent: Wallswitch {}
+    }
 
-    // clipboard history panel (standalone, screen-centered, not a bar feature)
-    ClipboardPopup {}
+    // clipboard history panel (standalone, screen-centered, not a bar
+    // feature) — created on demand, destroyed on close
+    Loader {
+        active: Popups.active === "clip"
+        sourceComponent: ClipboardPopup {}
+    }
 
     // session lock screen (hyprlock replacement). Inert until something sets
     // LockState.engaged (qs:lock shortcut / hypridle via `hyprctl eval`
