@@ -765,8 +765,10 @@ directly).
   its own `center` transition and would double-apply. There is NO CLI flag
   to override it (checked 4.2.0 `util/arguments.rs`). awww's non-zero exit
   short-circuits matugen so the palette can never desync from the wallpaper.
-- **Data**: `find ~/Pictures/wallpapers/images -maxdepth 1 -type f` (same ext
-  glob as the old script, ~472 files, flat) piped to `sort`, plus
+- **Data**: `find ~/Pictures/wallpapers -type f` (same ext glob as the old
+  script; RECURSIVE since 2026-10-07 — wallpapers may sit in subdirectories
+  of `wallDir` like `images/`, and the ext glob keeps non-image files such
+  as `scripts/` out) piped to `sort`, plus
   `awww query` parsed with `(?<=image: ).*` (same as hyprlock-auto.sh). Both
   re-run on every open; selection resolves when the list lands (the query may
   arrive before or after it — `resolveSelection()` handles both orders).

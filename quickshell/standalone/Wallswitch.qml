@@ -46,7 +46,7 @@ PanelWindow {
     property var shown: []              // indices into `walls` matching `query`
     property int selectedPos: 0         // `selected`'s position within `shown`
 
-    readonly property string wallDir: Quickshell.env("HOME") + "/Pictures/wallpapers/images"
+    readonly property string wallDir: Quickshell.env("HOME") + "/Pictures/wallpapers"
     // random pick per apply. NB: 'slide' (in the old rofi script's list) is
     // NOT a valid awww transition — it fails the whole apply
     readonly property var transitions: ["fade", "wipe", "outer", "grow", "random"]
