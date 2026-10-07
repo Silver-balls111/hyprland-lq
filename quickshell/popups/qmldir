@@ -1,0 +1,10 @@
+BluetoothPopup 1.0 BluetoothPopup.qml
+CalendarPanel 1.0 CalendarPanel.qml
+ClipboardPopup 1.0 ClipboardPopup.qml
+DashPopup 1.0 DashPopup.qml
+NotifsPanel 1.0 NotifsPanel.qml
+PowerPopup 1.0 PowerPopup.qml
+RicePopup 1.0 RicePopup.qml
+SystemUsage 1.0 SystemUsage.qml
+TrayMenuPopup 1.0 TrayMenuPopup.qml
+WifiPopup 1.0 WifiPopup.qml
