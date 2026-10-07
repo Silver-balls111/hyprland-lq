@@ -69,12 +69,11 @@ Pill {
             readonly property color idleColor: Qt.rgba(
                 Theme.accentSoft.r, Theme.accentSoft.g, Theme.accentSoft.b, 0)
 
-            // idle + hover share one width; the ACTIVE cell is wider
-            // (waybar parity). Switching swaps the two widths between cells,
-            // so the pill's total width stays constant for equal labels —
-            // the small fill motion mid-switch is subtle and waybar has it too.
-            width: wsCell.isActive ? Math.max(44, wsLabel.implicitWidth + 36)
-                                   : Math.max(34, wsLabel.implicitWidth + 26)
+            // ONE width for every state: switching workspaces animates color
+            // only, and the pill resizes exclusively when the workspace COUNT
+            // changes (a 6th+ slot appears). A wider active cell + width
+            // animation was implemented and reverted twice — do not re-add it.
+            width: Math.max(34, wsLabel.implicitWidth + 26)
             height: Theme.pillHeight
             radius: height / 2
             color: isActive ? Theme.accent
@@ -83,9 +82,6 @@ Pill {
 
             Behavior on color {
                 ColorAnimation { duration: 130 }
-            }
-            Behavior on width {
-                NumberAnimation { duration: 170; easing.type: Easing.OutCubic }
             }
 
             Text {

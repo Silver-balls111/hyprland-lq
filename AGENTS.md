@@ -34,7 +34,7 @@ relative imports (`import "../core"`).
 |---|---|
 | `shell.qml` | Entry point. `//@ pragma UseQApplication` is **required** (tray menus need it). Hosts the `GlobalShortcut`s (`powermenu` + `notification` under appid `qs-bar`, `wallpaper-switcher` under appid `qs`), the `NotificationServer` (once, NOT per-screen — see notification gotcha), the palette `FileView` (repo-local `colors.css`) and the `Toast`, `Osd` and `Wallswitch` windows. `Variants` spawns one `Bar` per screen (declared BEFORE `Wallswitch` so the picker's invisible input shield stacks above the bar). |
 | `bar/Bar.qml` | 46px `PanelWindow` (layer Top). Anchors the three pills and instantiates the four `RicePopup`s + `TrayMenuPopup`. Also hosts `showTooltip()`/`hideTooltip()` which delegate to `TooltipWindow`. |
-| `bar/Workspaces.qml` | Hyprland workspaces, min 5 persistent slots (`minCount`), click switches via dispatch. Urgent workspaces tint orange. Active cell is wider than idle/hover; every cell (first/last included) fills number-sized — no edge caps. |
+| `bar/Workspaces.qml` | Hyprland workspaces, min 5 persistent slots (`minCount`), click switches via dispatch. Urgent workspaces tint orange. Every cell (first/last, idle/hover/active) shares ONE fixed width — no edge caps — so the pill resizes only when the workspace count changes (see Workspaces gotcha). |
 | `bar/ClockPill.qml` | Center pill: stateful bell + time (no clock glyph — removed 2026-10-04). Bell mirrors waybar's notification-module glyphs via `Notifs.unread`/`Notifs.dnd`; unread also boosts color from fgMuted to fg. Owns a `SystemClock`. Hover = date tooltip, click = dashboard popup. |
 | `bar/StatusPill.qml` | Right pill: SystemTray items, volume (scroll ±1% / click mute), mic, wifi, bluetooth, battery, power. Exposes `wifiRightX`/`btRightX`/`powerRightX` so Bar can anchor popups under the right icons — **do not delete these**, the popups depend on them. |
 | `core/Popups.qml` (singleton) | `active` = name of the open popup ("" / "clock" / "wifi" / "bt" / "power" / "tray" / "wall"). Single source of truth for popup exclusivity. `lastDismiss` guards against the outside-click that dismissed a popup re-triggering a toggle. |
@@ -314,7 +314,7 @@ JetBrains Mono Nerd Font Propo it renders as a **filled square** (codepoint
 collision). Always render-test new glyphs with a throwaway qs instance +
 `grim` before committing them; don't trust fc-query alone.
 
-### Workspaces pill: edge caps, per-state widths, and the silent Repeater-id trap
+### Workspaces pill: fixed cell widths and the silent Repeater-id trap
 State of `Workspaces.qml` after the 2026-10-04 debug session (uncommitted at
 the time of writing — the user reviews commits themselves).
 
@@ -337,13 +337,17 @@ the time of writing — the user reviews commits themselves).
   cell now sits inside the Pill's `hpadding` and fills number-sized. (If ever
   re-added: the cells CANNOT resolve a Repeater `id` — derive edge-ness from
   `root.wsValues`, see the trap above.)
-- **Width contract (user-specified, matched against their waybar):** idle and
-  hover share `max(34, label + 26)`; the ACTIVE cell is wider,
-  `max(44, label + 36)`, animated 170ms OutCubic. Switching swaps the two
-  widths between cells, so the pill's total width stays constant for
-  equal-length labels; a small fill motion mid-switch is inherent and the user
-  accepts it (their waybar shows the same artifact, subtler). Hover must never
-  change width and must never reach the pill's ends.
+- **Width contract (FINAL 2026-10-07 — the wider-active design was tried,
+  reverted, re-requested, and reverted again; do NOT re-introduce it):** every
+  cell is ONE fixed width, `max(34, label + 26)`, and there is no
+  `Behavior on width`. Switching workspaces animates COLOR only; the pill's
+  width changes exclusively when the workspace count changes (a 6th+ slot
+  appearing/departing). History: waybar-parity wider-active
+  (`max(44, label + 36)` + 170ms OutCubic) shipped twice — the net-zero width
+  swap keeps the pill's TOTAL constant for equal-length labels, but the
+  growing/shrinking fill mid-switch reads as "the pill resizing" and the user
+  ultimately chose fully static geometry. Hover/idle/active widths are
+  identical by design; nothing about a workspace switch moves any geometry.
 - **Debug notes from that session:** `console.log` never surfaces through `qs`
   — use `console.warn`. Verify renders by pixel-scanning screenshots
   (contiguous color runs per row; accent `#f7c2d1` vs pale `pillBg` are
