@@ -8,30 +8,44 @@ QtObject {
     readonly property real textSize: 14.5
 
     // ---- palette ----
-    // Defaults = a snapshot of the CURRENT wallpaper's matugen palette (the
-    // dark scheme from colors.css) so the shell never flashes the fallback
-    // pink on start or if colors.css is missing. shell.qml watches
-    // colors.css and feeds it to applyPaletteCss(), so these still switch
-    // with the wallpaper — live, via watchChanges. Derived tones below stay
-    // formulaic on top of the roles.
-    property color pillBg: Qt.rgba(0.757, 0.776, 0.867, 0.88)      // secondary
-    property color pillHover: Qt.rgba(0.867, 0.886, 0.976, 0.95)   // secondary_fixed
+    // Source: the Colors singleton (core/Colors.qml), which FileView-watches
+    // the matugen-generated colors.json (md3 roles; see the
+    // [templates.quickshell] block in ~/.config/matugen/config.toml). Until
+    // matugen's first run the md3 strings are "transparent" — the fallbacks
+    // below (a snapshot of a previously generated scheme) keep the shell
+    // renderable. Roles → Theme mapping: pill/popup bodies = secondary
+    // (translucent), hover/active fills = secondary_fixed, text =
+    // on_secondary, urgent = error, danger text = error_container (dark tone,
+    // readable on light pills). Derived tones stay formulaic on top.
+    readonly property color secondary: Colors.md3.secondary !== "transparent"
+        ? Colors.md3.secondary : "#c1c6dd"
+    readonly property color secondaryFixed: Colors.md3.secondary_fixed !== "transparent"
+        ? Colors.md3.secondary_fixed : "#dde2f9"
+    readonly property color onSecondary: Colors.md3.on_secondary !== "transparent"
+        ? Colors.md3.on_secondary : "#2a3042"
+    readonly property color error: Colors.md3.error !== "transparent"
+        ? Colors.md3.error : "#ffb4ab"
+    readonly property color errorContainer: Colors.md3.error_container !== "transparent"
+        ? Colors.md3.error_container : "#93000a"
+
+    readonly property color pillBg: Qt.rgba(secondary.r, secondary.g, secondary.b, 0.88)
+    readonly property color pillHover: Qt.rgba(secondaryFixed.r, secondaryFixed.g, secondaryFixed.b, 0.95)
     // opaque on purpose — popups must never go see-through (a compositor-side
     // layerrule pins opacity to 1 as well, see README layer rules)
-    property color popupBg: Qt.rgba(0.757, 0.776, 0.867, 1.0)      // secondary
+    readonly property color popupBg: secondary
 
     // active workspace / highlights
-    property color accent: "#dde2f9"        // secondary_fixed
-    property color accentSoft: Qt.rgba(0.867, 0.886, 0.976, 0.55)
+    readonly property color accent: secondaryFixed
+    readonly property color accentSoft: Qt.rgba(secondaryFixed.r, secondaryFixed.g, secondaryFixed.b, 0.55)
     // workspace that requested attention
-    property color urgent: "#ffb4ab"        // error
+    readonly property color urgent: error
 
     // text
-    property color fg: "#2a3042"            // on_secondary
+    readonly property color fg: onSecondary
     readonly property color fgMuted: Qt.rgba(fg.r, fg.g, fg.b, 0.55)
 
     // danger accents (critical notifications, destructive rows)
-    property color danger: "#93000a"        // error_container
+    readonly property color danger: errorContainer
 
     // misc sheens / overlays — deliberately fixed whites or fg-derived so they
     // work on any palette hue without their own matugen role
@@ -46,31 +60,4 @@ QtObject {
     readonly property int pillHeight: 36
     readonly property int popupRadius: 18
     readonly property int osdHeight: 52
-
-    // Feed with the contents of a matugen colors.css (@define-color lines).
-    // Roles → Theme mapping: pill/popup bodies = secondary (translucent),
-    // hover/active fills = secondary_fixed, text = on_secondary, urgent =
-    // error, danger text = error_container (dark tone, readable on light
-    // pills). Unknown/missing roles keep the current values.
-    function applyPaletteCss(css) {
-        const map = {};
-        const re = /@define-color\s+([a-z0-9_]+)\s+(#[0-9a-fA-F]{6})/g;
-        let m;
-        while ((m = re.exec(css)) !== null) map[m[1]] = m[2];
-        if (!map.secondary || !map.on_secondary) return;
-        const rgb = hex => Qt.rgba(
-            parseInt(hex.slice(1, 3), 16) / 255,
-            parseInt(hex.slice(3, 5), 16) / 255,
-            parseInt(hex.slice(5, 7), 16) / 255, 1);
-        const sec = rgb(map.secondary);
-        const fix = rgb(map.secondary_fixed || map.secondary);
-        fg = map.on_secondary;
-        pillBg = Qt.rgba(sec.r, sec.g, sec.b, 0.88);
-        pillHover = Qt.rgba(fix.r, fix.g, fix.b, 0.95);
-        popupBg = Qt.rgba(sec.r, sec.g, sec.b, 1.0);
-        accent = fix;
-        accentSoft = Qt.rgba(fix.r, fix.g, fix.b, 0.55);
-        if (map.error) urgent = rgb(map.error);
-        if (map.error_container) danger = rgb(map.error_container);
-    }
 }

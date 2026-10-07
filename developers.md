@@ -55,7 +55,7 @@ Everything else is grouped by role; each directory carries its own `qmldir`.
 ```
 shell.qml            Entry: GlobalShortcuts, NotificationServer, palette FileView,
                      Toast/Osd, per-screen Bar (Variants), Wallswitch, Clipboard, Lockscreen
-colors.css           matugen OUTPUT (generated, watched live — do not hand-edit)
+core/Colors.qml      palette singleton — FileView-watches matugen's colors.json (regenerated, do not hand-edit)
 core/                Singletons: Theme, Icons, Popups, Notifs, LockState, ScreenTime
 ui/                  Reusable primitives: NIcon, Pill, Toggle, SignalBars, RoundedImage, TooltipWindow
 bar/                 The bar and its feedback surfaces: Bar, Workspaces, ClockPill, StatusPill, Osd, Toast
@@ -90,10 +90,11 @@ after `Variants` so their invisible input shields stack above the bar).
 
 ### Theming
 
-matugen writes `colors.css` into the repo root (`[templates.quickshell]` in
-`~/.config/matugen/config.toml`); `shell.qml`'s `FileView` watches it and calls
-`Theme.applyPaletteCss(text())` on every change — every color binding in the
-tree follows. Derived tones (fgMuted, track, divider, …) stay formulaic on top
+matugen renders `colors.json` (`[templates.quickshell]` in
+`~/.config/matugen/config.toml` → `~/.local/state/quickshell/generated/`);
+`core/Colors.qml` (singleton, FileView + JsonAdapter) watches it live, and
+`core/Theme.qml` maps its md3 roles onto the UI palette — every color binding
+in the tree follows. Derived tones (fgMuted, track, divider, …) stay formulaic on top
 of the matugen roles. Fonts: Rubik for all text, JetBrains Mono Nerd Font Propo
 for glyphs, one `Theme.textSize` (14.5), **no `font.weight` anywhere**.
 
@@ -132,7 +133,7 @@ the shield and closes the popup. Invariants:
 
 | Singleton | Owns |
 |---|---|
-| `Theme` | Fonts, `textSize`, metrics, palette + `applyPaletteCss()` role mapping |
+| `Theme` | Fonts, `textSize`, metrics, palette role mapping (md3 roles off `Colors`) |
 | `Icons` | Nerd-font codepoint map, `batteryGlyph()`, per-glyph `yOffset()` |
 | `Popups` | Which popup is open (exclusivity), dismiss guard |
 | `Notifs` | Notification history (capped 30), unread/DND state, toast routing |
@@ -212,8 +213,8 @@ above.
 expose anchor properties, wire tooltips through `Bar.showTooltip()`.
 
 **Recolor**: nothing to do in QML — matugen drives everything. To change the
-*role mapping* (which matugen role feeds which UI color), edit
-`Theme.applyPaletteCss`.
+*role mapping* (which matugen role feeds which UI color), edit the role
+bindings at the top of `core/Theme.qml`.
 
 ## Hyprland integration
 

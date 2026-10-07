@@ -91,16 +91,16 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
    Popups/toasts need no opacity rule — they are opaque by design, and
    `hl.layer_rule` has no `opacity` field anyway.
 
-5. **Palette (matugen)** — `~/.config/matugen/config.toml` must generate the
-   colors file the bar watches, inside this repo:
+5. **Palette (matugen)** — the bar reads the InioX matugen-themes quickshell
+   flow: matugen renders a JSON palette that `core/Colors.qml` watches:
    ```toml
    [templates.quickshell]
-   input_path = '~/.config/matugen/templates/colors.css'
-   output_path = '~/Documents/Dev/quickshell_rice/colors.css'
+   input_path = '~/.config/matugen/templates/quickshell.json'
+   output_path = '~/.local/state/quickshell/generated/colors.json'
    ```
-   No `post_hook` needed — the bar watches the file and recolors live. Run
+   No `post_hook` needed — the bar watches the JSON and recolors live. Run
    matugen once against your wallpaper (`matugen image <wallpaper>` or the
-   wallpaper picker's apply); until then the fallback pink palette shows.
+   wallpaper picker's apply); until then a snapshot fallback palette shows.
    NB: keep the `[config.wallpaper]` section present even with
    `set = false` — matugen 4.2 aborts with "missing field" if the block or
    its `command`/`arguments` fields are removed.
@@ -165,7 +165,7 @@ clicking a bar pill toggles it directly. Clicks inside a panel never close it.
 
 ```
 shell.qml        entry point (must stay at the repo root — qs -c loads it)
-colors.css       matugen output (generated; watched live — do not hand-edit)
+core/Colors.qml  palette singleton — watches matugen's colors.json (regenerated; do not hand-edit)
 core/            singletons: Theme, Icons, Popups, Notifs, LockState, ScreenTime
 ui/              primitives: NIcon, Pill, Toggle, SignalBars, RoundedImage, TooltipWindow
 bar/             the bar + its feedback surfaces: Bar, Workspaces, ClockPill, StatusPill, Osd, Toast
@@ -180,7 +180,7 @@ shaders/         parked Wallswitch shader experiment (not used by live code)
 
 | File | Controls |
 |---|---|
-| `core/Theme.qml` | **Font family** (`fontFamily`, Rubik), **the single text size** (`textSize`, 14.5 — every non-icon text uses it), icon font (`nerdFont`), fallback palette colors, the matugen role → bar-color mapping (`applyPaletteCss`), metrics (`barHeight`, `pillHeight`, `popupRadius`) |
+| `core/Theme.qml` | **Font family** (`fontFamily`, Rubik), **the single text size** (`textSize`, 14.5 — every non-icon text uses it), icon font (`nerdFont`), the matugen role → bar-color mapping (md3 roles off `Colors`, with fallbacks), metrics (`barHeight`, `pillHeight`, `popupRadius`) |
 | `core/Icons.qml` | Nerd Font glyph map (add glyphs here + a `yOffsets` entry if it sits off-center), battery icon sets |
 | `shell.qml` | Global shortcuts (`powermenu`, `notification`), palette file path (`FileView`), notification daemon capabilities, toast instantiation |
 | `bar/Bar.qml` | Pill layout and popup anchoring |

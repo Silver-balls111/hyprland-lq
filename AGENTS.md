@@ -255,37 +255,42 @@ pill as the `yItem` so every tooltip sits at one height. Toast sits at
   (clock/status pills previously content-sized and drifted apart from the
   workspaces pill), centered via 5px top margins in the 46px bar.
 
-### Palette is matugen-driven + fonts are uniform (2026-10-04)
-- `shell.qml` hosts a `FileView` watching `<repo>/colors.css` — since
-  2026-10-04 the matugen template lives IN this repo
-  (`[templates.quickshell]` in `~/.config/matugen/config.toml`, output
-  `~/Documents/Dev/quickshell_rice/colors.css`; the old
-  `~/.config/waybar/colors.css` path and its `[templates.waybar]` block are
-  retired — the user comments the waybar block out whenever they get to it).
-  Chain: `watchChanges: true` →
-  `onFileChanged: reload()` → `onLoaded: Theme.applyPaletteCss(text())` →
-  Theme color properties update → every binding follows. Verified live with
-  BOTH write styles (in-place and sed -i rename) — pixel-sampled transitions.
-- **matugen 4.2 config traps**: the `[config.wallpaper]` section must EXIST
-  even when it only says `set = false` — commenting the whole block out
-  aborts every matugen invocation with "missing field `config`", and the
-  section's `command`/`arguments` fields are required too ("missing field
-  `command`") even though they're never executed while `set = false`. Both
-  were hit live when the block got fully commented out — every apply fails
-  until it's restored.
-- **FileView traps**: the public `text` is a FUNCTION that shadows the
-  internal property (`text()` — passing bare `text` hands the parser a
-  function object and it silently matches nothing); `watchChanges` fires
-  `fileChanged` but does NOT re-read by itself — call `reload()`; and never
-  declare two `onFileChanged`/`onLoaded` handlers (QML: "Property value set
-  multiple times" → whole config fails to load while the old engine keeps
-  running, which makes every later edit look like it "did nothing").
-- Role mapping in `applyPaletteCss`: `secondary` → pillBg/popupBg
-  (translucent), `secondary_fixed` → pillHover/accent/accentSoft,
-  `on_secondary` → fg, `error` → urgent, `error_container` → danger
-  (dark tone, readable as text on light pills). Derived tones (fgMuted,
-  track, divider, border, rowHover, inputBg) stay formulaic on top of the
-  roles — don't give them matugen roles.
+### Palette is Colors.md3 (matugen quickshell.json flow) + fonts are uniform (2026-10-07)
+- Flow: matugen `[templates.quickshell]` (~/.config/matugen/config.toml)
+  renders `~/.config/matugen/templates/quickshell.json` →
+  `~/.local/state/quickshell/generated/colors.json` (md3 = 50 roles,
+  palette = 108 tonal keys, base16 = 16). `core/Colors.qml` — the InioX
+  matugen-themes quickshell pattern: `Singleton` + `FileView` + `JsonAdapter`
+  (watchChanges → live reload) — exposes `Colors.md3/.palette/.base16`.
+  `core/Theme.qml` maps md3 roles onto the UI palette; every color binding in
+  the tree follows. The old colors.css → `applyPaletteCss` flow is REMOVED
+  (shell.qml's FileView and Theme's function are gone; colors.css is deleted
+  from the repo).
+- Role mapping (Theme.qml top): `secondary` → pillBg/popupBg (translucent),
+  `secondary_fixed` → pillHover/accent/accentSoft, `on_secondary` → fg,
+  `error` → urgent, `error_container` → danger (dark tone, readable on light
+  pills). Derived tones (fgMuted, track, divider, border, rowHover, inputBg)
+  stay formulaic on top — don't give them matugen roles. Change the mapping by
+  editing those bindings, not the consumers.
+- **Until matugen's first run the md3 strings are `"transparent"`** — Theme
+  falls back to a snapshot hex per role (secondary #c1c6dd, secondary_fixed
+  #dde2f9, on_secondary #2a3042, error #ffb4ab, error_container #93000a) so
+  the shell renders normally. `"transparent"` is also what an unloadable
+  colors.json yields — same fallback covers it.
+- **FileView traps still apply to Colors.qml**: its `onFileChanged: reload()`
+  is REQUIRED (watchChanges alone only fires the signal); a JsonAdapter
+  string property is compared as a plain string (`!== "transparent"`) and
+  auto-converts when assigned to a `color` property; never declare two
+  handlers for the same signal (QML: "Property value set multiple times" →
+  whole config fails while the old engine runs).
+- matugen notes: `[config.wallpaper]` must keep `set = false` with its
+  `command`/`arguments` fields present (4.2 aborts on "missing field"
+  otherwise). The kitty template block is ACTIVE again (post_hook =
+  `kitty +kitten themes --reload-in=all Matugen` — no more kill-SIGUSR1
+  noise). The user is developing zen-browser templates: matugen can die with
+  "Failed to get the input and output paths from hashmap" from THOSE —
+  unrelated to quickshell (its template is #2 and regenerates before any zen
+  failure; verified per-template).
 - All non-icon text: `Theme.textSize` (14.5) in Rubik, **no font.weight
   anywhere** (single rule, mirrors the waybar CSS). Only NIcon sizes differ.
   Icon glyphs remain the nerd font via `Theme.nerdFont`.

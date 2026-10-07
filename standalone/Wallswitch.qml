@@ -129,7 +129,6 @@ PanelWindow {
         }
     }
 
-    // same parse hyprlock-auto.sh uses: `(?<=image: ).*`
     Process {
         id: queryProc
         command: ["sh", "-c", "awww query 2>/dev/null | grep -oP '(?<=image: ).*' | head -n 1"]
