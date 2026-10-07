@@ -1,0 +1,83 @@
+# NB: this section must EXIST (set = false is fine, but removing the block
+# or the command/arguments fields makes matugen 4.2 abort with
+# "missing field ..." — the command is never run while set = false)
+[config.wallpaper]
+set = false
+command = "awww"
+arguments = ["img", "--transition-type", "center", "--transition-fps", "60"]
+
+[templates.hyprland]
+input_path = '~/.config/matugen/templates/hyprland-colors.lua'
+output_path = '~/.config/hypr/colors.lua'
+post_hook = 'hyprctl reload'
+
+[templates.quickshell]
+input_path = '~/.config/matugen/templates/quickshell.json'
+output_path = '~/.local/state/quickshell/generated/colors.json'
+
+[templates.rofi ]
+input_path = '~/.config/matugen/templates/rofi-colors.rasi'
+output_path = '~/.config/rofi/colors.rasi'
+
+[templates.kitty]
+input_path = '~/.config/matugen/templates/kitty-colors.conf'
+output_path = '~/.config/kitty/themes/Matugen.conf'
+post_hook = "kitty +kitten themes --reload-in=all Matugen"
+
+[templates.alacritty]
+input_path = '~/.config/matugen/templates/alacritty.toml'
+output_path = '~/.config/alacritty/colors.toml'
+
+[templates.gtk3]
+input_path = '~/.config/matugen/templates/gtk-colors.css'
+output_path = '~/.config/gtk-3.0/colors.css'
+post_hook = 'gsettings set org.gnome.desktop.interface gtk-theme ""; gsettings set org.gnome.desktop.interface gtk-theme adw-gtk3-{{mode}}'
+
+[templates.gtk4]
+input_path = '~/.config/matugen/templates/gtk-colors.css'
+output_path = '~/.config/gtk-4.0/colors.css'
+post_hook = '~/.config/matugen/post-hook-scripts/gtk-themes-reload.sh'
+# in new install do this as well
+# chmod +x ~/.config/matugen/post-hook-scripts/gtk-themes-reload.sh
+
+[templates.btop]
+input_path = '~/.config/matugen/templates/btop.theme'
+output_path = '~/.config/btop/themes/matugen.theme'
+post_hook = 'pkill -USR2 btop || true'
+
+[templates.cava]
+input_path = '~/.config/matugen/templates/cava-colors.ini'
+output_path = '~/.config/cava/themes/matugen-theme'
+post_hook = 'pkill -USR1 cava'
+
+[templates.heroic]
+input_path = '~/.config/matugen/templates/heroic.css'
+output_path = '~/.config/heroic/themes/matugen.css'
+
+[templates.obs]
+input_path = '~/.config/matugen/templates/obs.obt'
+output_path = '~/.config/obs-studio/themes/matugen.obt'
+
+[templates.obsidian]
+input_path = '~/.config/matugen/templates/obsidian.css'
+output_path = '~/Documents/Obsidian Vault/.obsidian/snippets/matugen.css'
+
+[templates.yazi]
+input_path = '~/.config/matugen/templates/yazi-theme.toml'
+output_path = '~/.config/yazi/theme.toml'
+
+[templates.zen-userchrome]
+input_path = '~/.config/matugen/templates/zen-browser/userchrome.css'
+output_path = '~/.zen-profiles/abc123.default/chrome/zen-userChrome.css'
+
+[templates.zen-usercontent]
+input_path = '~/.config/matugen/templates/zen-browser/usercontent.css'
+output_path = '~/.zen-profiles/abc123.default/chrome/zen-userContent.css'
+
+[templates.zed]
+input_path = '~/.config/matugen/templates/zed-colors.json'
+output_path = '~/.config/zed/themes/matugen.json'
+
+[templates.firefox-website-colors]
+input_path = "~/.config/matugen/templates/zen-browser/website-color.css"
+output_path = "~/.zen-profiles/abc123.default/chrome/zen-webColors.css"
