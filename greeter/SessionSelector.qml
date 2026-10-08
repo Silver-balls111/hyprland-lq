@@ -1,0 +1,131 @@
+import QtQuick
+import QtQuick.Controls.Basic
+
+Item {
+    id: root
+    property var sessions: []
+    property var currentSession: null
+    property bool open: false
+    signal sessionSelected(var session)
+
+    implicitWidth: triggerPill.implicitWidth
+    implicitHeight: triggerPill.implicitHeight
+
+    // Trigger pill in bottom-left
+    Pill {
+        id: triggerPill
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        active: root.open
+        onClicked: root.open = !root.open
+
+        NIcon {
+            anchors.verticalCenter: parent.verticalCenter
+            name: "desktop"
+            iconSize: 15
+            iconColor: Theme.fg
+        }
+
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.currentSession ? root.currentSession.name : "Session"
+            color: Theme.fg
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.textSize
+        }
+
+        NIcon {
+            anchors.verticalCenter: parent.verticalCenter
+            name: root.open ? "chevronUp" : "chevronDown"
+            iconSize: 12
+            iconColor: Theme.fgMuted
+        }
+    }
+
+    // Popup panel positioned above the trigger
+    Rectangle {
+        id: popup
+        visible: root.open
+        anchors.bottom: triggerPill.top
+        anchors.bottomMargin: 10
+        anchors.left: triggerPill.left
+        width: Math.max(220, triggerPill.width + 40)
+        height: Math.min(260, sessionList.contentHeight + 20)
+        radius: Theme.popupRadius
+        color: Theme.popupBg
+        border.width: 1
+        border.color: Theme.border
+
+        // Swallower mouse area to prevent click-through
+        MouseArea {
+            anchors.fill: parent
+            onClicked: {} // consume click
+        }
+
+        ListView {
+            id: sessionList
+            anchors.fill: parent
+            anchors.margins: 10
+            spacing: 4
+            clip: true
+            model: root.sessions
+            boundsBehavior: Flickable.StopAtBounds
+
+            delegate: Rectangle {
+                required property var modelData
+                required property int index
+
+                width: sessionList.width
+                height: 38
+                radius: 12
+                readonly property bool isSelected: root.currentSession && root.currentSession.name === modelData.name
+                readonly property bool isHovered: itemMouse.containsMouse
+
+                color: isSelected ? Theme.pillHover : (isHovered ? Theme.rowHover : "transparent")
+
+                Row {
+                    anchors.fill: parent
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+                    spacing: 10
+
+                    NIcon {
+                        anchors.verticalCenter: parent.verticalCenter
+                        name: modelData.type === "wayland" ? "wayland" : "desktop"
+                        iconSize: 14
+                        iconColor: isSelected ? Theme.fg : Theme.fgMuted
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - 50
+                        elide: Text.ElideRight
+                        text: modelData.name
+                        color: Theme.fg
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.textSize
+                    }
+
+                    NIcon {
+                        anchors.verticalCenter: parent.verticalCenter
+                        name: "check"
+                        iconSize: 14
+                        iconColor: Theme.fg
+                        visible: isSelected
+                    }
+                }
+
+                MouseArea {
+                    id: itemMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        root.sessionSelected(modelData);
+                        root.open = false;
+                    }
+                }
+            }
+        }
+    }
+}

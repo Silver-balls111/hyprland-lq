@@ -58,6 +58,7 @@ RicePopup {
     // in-shell Lockscreen via LockState — PAM flow verified against
     // /etc/pam.d/login, the same stack hyprlock uses)
     function run(entry) {
+        Actions.syncGreetdWallpaper();
         Popups.close();
         if (entry.act === "lock") { LockState.engaged = true; return; }
         Quickshell.execDetached(entry.cmd);
