@@ -1,104 +1,104 @@
-local colors = {
-    
-    background = "rgba(151218ff)",
-    
-    error = "rgba(ffb4abff)",
-    
-    error_container = "rgba(93000aff)",
-    
-    inverse_on_surface = "rgba(322f35ff)",
-    
-    inverse_primary = "rgba(67548eff)",
-    
-    inverse_surface = "rgba(e7e0e8ff)",
-    
-    on_background = "rgba(e7e0e8ff)",
-    
-    on_error = "rgba(690005ff)",
-    
-    on_error_container = "rgba(ffdad6ff)",
-    
-    on_primary = "rgba(38265cff)",
-    
-    on_primary_container = "rgba(eaddffff)",
-    
-    on_primary_fixed = "rgba(220f46ff)",
-    
-    on_primary_fixed_variant = "rgba(4f3d74ff)",
-    
-    on_secondary = "rgba(342d40ff)",
-    
-    on_secondary_container = "rgba(e9def8ff)",
-    
-    on_secondary_fixed = "rgba(1e182bff)",
-    
-    on_secondary_fixed_variant = "rgba(4b4358ff)",
-    
-    on_surface = "rgba(e7e0e8ff)",
-    
-    on_surface_variant = "rgba(cbc4cfff)",
-    
-    on_tertiary = "rgba(4a2530ff)",
-    
-    on_tertiary_container = "rgba(ffd9e1ff)",
-    
-    on_tertiary_fixed = "rgba(31101bff)",
-    
-    on_tertiary_fixed_variant = "rgba(643b46ff)",
-    
-    outline = "rgba(948f99ff)",
-    
-    outline_variant = "rgba(49454eff)",
-    
-    primary = "rgba(d2bcfdff)",
-    
-    primary_container = "rgba(4f3d74ff)",
-    
-    primary_fixed = "rgba(eaddffff)",
-    
-    primary_fixed_dim = "rgba(d2bcfdff)",
-    
-    scrim = "rgba(000000ff)",
-    
-    secondary = "rgba(cdc2dbff)",
-    
-    secondary_container = "rgba(4b4358ff)",
-    
-    secondary_fixed = "rgba(e9def8ff)",
-    
-    secondary_fixed_dim = "rgba(cdc2dbff)",
-    
-    shadow = "rgba(000000ff)",
-    
-    source_color = "rgba(776c8bff)",
-    
-    surface = "rgba(151218ff)",
-    
-    surface_bright = "rgba(3b383eff)",
-    
-    surface_container = "rgba(211f24ff)",
-    
-    surface_container_high = "rgba(2b292fff)",
-    
-    surface_container_highest = "rgba(36343aff)",
-    
-    surface_container_low = "rgba(1d1b20ff)",
-    
-    surface_container_lowest = "rgba(0f0d13ff)",
-    
-    surface_dim = "rgba(151218ff)",
-    
-    surface_tint = "rgba(d2bcfdff)",
-    
-    surface_variant = "rgba(49454eff)",
-    
-    tertiary = "rgba(f0b7c5ff)",
-    
-    tertiary_container = "rgba(643b46ff)",
-    
-    tertiary_fixed = "rgba(ffd9e1ff)",
-    
-    tertiary_fixed_dim = "rgba(f0b7c5ff)",
-    
+return {
+    image = "/home/bandit/Pictures/wallpapers/purple-grass.jpg",
+
+    background = "0xff191113",
+
+    error = "0xffffb4ab",
+
+    error_container = "0xff93000a",
+
+    inverse_on_surface = "0xff382e30",
+
+    inverse_primary = "0xff8c4a5f",
+
+    inverse_surface = "0xffefdfe1",
+
+    on_background = "0xffefdfe1",
+
+    on_error = "0xff690005",
+
+    on_error_container = "0xffffdad6",
+
+    on_primary = "0xff551d31",
+
+    on_primary_container = "0xffffd9e1",
+
+    on_primary_fixed = "0xff3a071c",
+
+    on_primary_fixed_variant = "0xff703347",
+
+    on_secondary = "0xff422930",
+
+    on_secondary_container = "0xffffd9e1",
+
+    on_secondary_fixed = "0xff2b151c",
+
+    on_secondary_fixed_variant = "0xff5b3f47",
+
+    on_surface = "0xffefdfe1",
+
+    on_surface_variant = "0xffd6c2c5",
+
+    on_tertiary = "0xff47290b",
+
+    on_tertiary_container = "0xffffdcc0",
+
+    on_tertiary_fixed = "0xff2d1600",
+
+    on_tertiary_fixed_variant = "0xff613f1f",
+
+    outline = "0xff9e8c90",
+
+    outline_variant = "0xff514346",
+
+    primary = "0xffffb1c6",
+
+    primary_container = "0xff703347",
+
+    primary_fixed = "0xffffd9e1",
+
+    primary_fixed_dim = "0xffffb1c6",
+
+    scrim = "0xff000000",
+
+    secondary = "0xffe3bdc6",
+
+    secondary_container = "0xff5b3f47",
+
+    secondary_fixed = "0xffffd9e1",
+
+    secondary_fixed_dim = "0xffe3bdc6",
+
+    shadow = "0xff000000",
+
+    source_color = "0xff331921",
+
+    surface = "0xff191113",
+
+    surface_bright = "0xff413739",
+
+    surface_container = "0xff261d1f",
+
+    surface_container_high = "0xff31282a",
+
+    surface_container_highest = "0xff3c3234",
+
+    surface_container_low = "0xff22191b",
+
+    surface_container_lowest = "0xff140c0e",
+
+    surface_dim = "0xff191113",
+
+    surface_tint = "0xffffb1c6",
+
+    surface_variant = "0xff514346",
+
+    tertiary = "0xffeebd93",
+
+    tertiary_container = "0xff613f1f",
+
+    tertiary_fixed = "0xffffdcc0",
+
+    tertiary_fixed_dim = "0xffeebd93",
+
 }
-return colors

@@ -45,6 +45,22 @@ Item {
             if (want.findIndex(e => e.id === rid) === -1)
                 historyModel.remove(r);
         }
+        // fresh model (popup is lazy — this runs on every open with the full
+        // history already in `want`): append newest-first in one pass. The
+        // descending insert(i) loop below REJECTS index > count ("insert:
+        // index N out of range") and used to leave only the newest row.
+        if (historyModel.count === 0) {
+            for (let j = 0; j < want.length; j++)
+                historyModel.append({
+                    entryId: want[j].id,
+                    appName: want[j].appName,
+                    summary: want[j].summary,
+                    body: want[j].body,
+                    urgency: want[j].urgency,
+                    expanded: false
+                });
+            return;
+        }
         for (let i = want.length - 1; i >= 0; i--) {
             if (findRow(want[i].id) === -1)
                 historyModel.insert(i, {
@@ -60,7 +76,7 @@ Item {
     // staggered removal for Clear / last-row removal
     Timer {
         id: cascadeTimer
-        interval: 80
+        interval: 150
         repeat: true
         onTriggered: {
             if (Notifs.history.length > 0 || historyModel.count === 0) {

@@ -1,5 +1,7 @@
 rofi btop cava yazi nautilus mpv-mpris zed vim obsidian fuse2(for running appimages)
-bleachbit satty sddm qt5-declarative(for sddm theme)
+bleachbit satty sddm qt5-declarative(for sddm theme) gnome-keyring(for zed auto login)
+7zip
+
 
 yay: zen-browser-bin heroic-games-launcer-bin
 
@@ -13,3 +15,5 @@ ex: sudo cp -r .icons/Future-dark-cursors/ /usr/share/icons
     ThemeDir=/usr/share/sddm/themes/
     Current=silent
 - for user avator put the png file ~/username.face.icon
+
+put the vim files of zed as well in backup

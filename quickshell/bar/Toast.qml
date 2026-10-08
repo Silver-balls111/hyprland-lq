@@ -9,6 +9,14 @@ import "../ui"
 // deadline passes. Small mapped-only window (TooltipWindow pattern: no input
 // masks on 0.3.1). Click a banner to expand/collapse the full body (its
 // deadline freezes while expanded); the corner ✕ dismisses it.
+//
+// The stack is mirrored into a ListModel (same pattern as NotifsPanel):
+// Notifs.activeToasts is a plain array reassigned on EVERY push/dismiss, and
+// a Repeater over it destroys and recreates ALL cards each time — a ✕ click
+// landing during a rebuild hit a destroyed delegate and was silently lost.
+// With the ListModel, cards are inserted/removed incrementally; a delegate
+// only dies when ITS toast leaves. Card → entry back-references are resolved
+// by the entry's stable `id` (entry objects survive the array reassignments).
 PanelWindow {
     id: root
 
@@ -41,6 +49,41 @@ PanelWindow {
         onTriggered: Notifs.expireTick()
     }
 
+    ListModel {
+        id: toastModel
+    }
+    function findRow(id) {
+        for (let r = 0; r < toastModel.count; r++)
+            if (toastModel.get(r).entryId === id) return r;
+        return -1;
+    }
+    function syncToasts() {
+        const want = Notifs.activeToasts;
+        for (let r = toastModel.count - 1; r >= 0; r--)
+            if (want.findIndex(e => e.id === toastModel.get(r).entryId) === -1)
+                toastModel.remove(r);
+        // ascending: want[0..i-1] are all present by the time row i inserts,
+        // so index i is always ≤ count (a descending loop would reject)
+        for (let i = 0; i < want.length; i++) {
+            if (findRow(want[i].id) === -1)
+                toastModel.insert(i, {
+                    entryId: want[i].id,
+                    appName: want[i].appName,
+                    summary: want[i].summary,
+                    body: want[i].body,
+                    urgency: want[i].urgency,
+                    expanded: false
+                });
+        }
+    }
+    Connections {
+        target: Notifs
+        function onActiveToastsChanged() {
+            syncToasts();
+        }
+    }
+    Component.onCompleted: syncToasts()
+
     Column {
         id: stackCol
         anchors.top: parent.top
@@ -49,23 +92,19 @@ PanelWindow {
         spacing: 8
 
         Repeater {
-            model: Notifs.activeToasts
+            model: toastModel
 
             delegate: Rectangle {
                 id: toastCard
-                required property var modelData
-                readonly property bool urgent: modelData.urgency === 2
+                required property int index
+                required property int entryId
+                required property string appName
+                required property string summary
+                required property string body
+                required property int urgency
+                required property bool expanded
 
-                // local mirror of the entry's expanded flag: toggling the LOCAL
-                // property animates the height, and onExpandedChanged keeps the
-                // entry in sync — mutating the entry alone is not reactive, and
-                // reassigning the stack would rebuild the card mid-animation
-                property bool expanded: modelData.expanded
-                onExpandedChanged: {
-                    modelData.expanded = expanded;
-                    if (!expanded)
-                        modelData.expiresAt = Math.max(modelData.expiresAt, Date.now() + 2000);
-                }
+                readonly property bool urgent: urgency === 2
 
                 width: stackCol.width
                 height: cardCol.implicitHeight + 20
@@ -104,7 +143,7 @@ PanelWindow {
 
                     Text {
                         width: parent.width
-                        text: toastCard.modelData.appName
+                        text: toastCard.appName
                         elide: Text.ElideRight
                         visible: text !== ""
                         color: Theme.fgMuted
@@ -113,15 +152,15 @@ PanelWindow {
                     }
                     Text {
                         width: parent.width
-                        text: toastCard.modelData.summary !== "" ? toastCard.modelData.summary : toastCard.modelData.appName
+                        text: toastCard.summary !== "" ? toastCard.summary : toastCard.appName
                         elide: Text.ElideRight
-                        color: urgent ? Theme.danger : Theme.fg
+                        color: toastCard.urgent ? Theme.danger : Theme.fg
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.textSize
                     }
                     Text {
                         width: parent.width
-                        text: toastCard.modelData.body
+                        text: toastCard.body
                         visible: text !== ""
                         wrapMode: Text.Wrap
                         elide: toastCard.expanded ? Text.ElideNone : Text.ElideRight
@@ -135,7 +174,18 @@ PanelWindow {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: toastCard.expanded = !toastCard.expanded
+                    onClicked: {
+                        const nv = !toastCard.expanded;
+                        toastModel.setProperty(toastCard.index, "expanded", nv);
+                        // mirror into the entry: Notifs.expireTick reads
+                        // entry.expanded, and collapsing re-arms its deadline
+                        const e = Notifs.activeToasts.find(t => t.id === toastCard.entryId);
+                        if (e) {
+                            e.expanded = nv;
+                            if (!nv)
+                                e.expiresAt = Math.max(e.expiresAt, Date.now() + 2000);
+                        }
+                    }
                 }
 
                 // dismiss ✕ — declared AFTER the fullscreen MouseArea so it
@@ -151,9 +201,13 @@ PanelWindow {
 
                     MouseArea {
                         anchors.fill: parent
-                        anchors.margins: -5
+                        // generous hit target around the 12px glyph
+                        anchors.margins: -8
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: Notifs.dismissToast(toastCard.modelData, true)
+                        onClicked: {
+                            const e = Notifs.activeToasts.find(t => t.id === toastCard.entryId);
+                            if (e) Notifs.dismissToast(e, true);
+                        }
                     }
                 }
             }

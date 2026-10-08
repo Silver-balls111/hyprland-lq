@@ -30,7 +30,7 @@ hl.bind("SHIFT + PRINT", hl.dsp.exec_cmd(variables.ss_screen))
 ------------------------------------
 hl.bind(mainMod .. " + N", hl.dsp.global("qs-bar:notification"))
 hl.bind(mainMod .. " + X", hl.dsp.global("qs-bar:powermenu"))
-hl.bind("SUPER + K", hl.dsp.global("qs:lock"))
+hl.bind("SUPER + L", hl.dsp.global("qs:lock"))
 hl.bind("SUPER + W", hl.dsp.global("qs:wallpaper-switcher"))
 hl.bind("SUPER + V", hl.dsp.global("qs:clipboard"))
 
