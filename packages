@@ -1,0 +1,15 @@
+rofi btop cava yazi nautilus mpv-mpris zed vim obsidian fuse2(for running appimages)
+bleachbit satty sddm qt5-declarative(for sddm theme)
+
+yay: zen-browser-bin heroic-games-launcer-bin
+
+for sddm:
+- create main file /etc/sddm.conf
+- cursor themes in /usr/share/icons
+ex: sudo cp -r .icons/Future-dark-cursors/ /usr/share/icons
+    sudo vim /usr/share/icons/default/index.theme
+    set to Future-dark Cursors
+- for theme download from aur then edit sddm.conf to
+    ThemeDir=/usr/share/sddm/themes/
+    Current=silent
+- for user avator put the png file ~/username.face.icon

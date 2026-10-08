@@ -2,18 +2,22 @@
 
 printf "Git Clone...\n"
 git clone https://Silver-balls111/hyprland-lq.git && cd hyprland-lq
-echo "Copying files...\n"
-cp -r .config/ ~/.config/
+printf "Copying files...\n"
+cp -r .config/ ~/
+cp -r quickshell/ ~/.config/
 
 printf "Package install...\n"
 sudo pacman -Syu --needed iwd wpa_supplicant wireless_tools dialog dhcpcd \
-hyprland hypridle hyprshot hyprsunset quickshell \
+hyprland hypridle hyprshot hyprsunset hyprshutdown quickshell \
 playerctl brightnessctl \
 imagemagick bluez networkmanager upower pipewire wireplumber blueman \
-matugen awww cliphist wl-clip-persist
+matugen awww cliphist wl-clip-persist rofi
 
 printf "AUR Packages install...\n"
-yay -Syu --needed ttf-jetbrains-mono-nerd ttf-rubik-vf sddm-silent-theme
+yay -Syu --needed blesh-git ttf-jetbrains-mono-nerd ttf-rubik-vf sddm-silent-theme
+
+cd ~/.config/rofi/
+chmod +x launch_rofi.sh generate_blur.sh
 
 printf "\n\n-Put wallpapers in ~/Pictures/wallpapers\n\n"
 printf "To make suspend work edit file:
