@@ -30,7 +30,7 @@ return {
 			qml = { "qmlformat" },
             json = { "prettier" },
             yaml = { "prettier" },
-            toml = { "prettier" },
+            toml = { "taplo" },
             markdown = { "prettier" },
 		},
 		default_format_opts = {

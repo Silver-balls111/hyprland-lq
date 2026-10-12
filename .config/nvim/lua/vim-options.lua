@@ -11,6 +11,14 @@ opt.autoindent = true -- copy indent from current line when starting new one
 
 opt.wrap = false
 
+opt.scrolloff = 8
+opt.undofile = true
+opt.updatetime = 250
+opt.confirm = true
+opt.inccommand = "split"
+opt.winborder = "rounded"
+opt.foldtext = "" -- fold line keeps its syntax highlighting (0.10+)
+
 -- search settings
 opt.ignorecase = true -- ignore case when searching
 opt.smartcase = true -- if you include mixed case in your search, assumes you want case-sensitive

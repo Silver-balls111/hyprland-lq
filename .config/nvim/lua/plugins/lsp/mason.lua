@@ -4,6 +4,10 @@ return {
 		-- using mason-lsp we don't need to remember all the installed
 		-- lsp names.
 		"mason-org/mason-lspconfig.nvim",
+		dependencies = {
+			{ "mason-org/mason.nvim", opts = {} },
+			"neovim/nvim-lspconfig",
+		},
 		opts = {
 			ensure_installed = {
 				"clangd",
@@ -16,21 +20,26 @@ return {
                 "qmlls",
 			},
 		},
-		dependencies = {
-			{ "mason-org/mason.nvim", opts = {} },
-			"neovim/nvim-lspconfig",
-		},
 	},
 	{
 		"WhoIsSethDaniel/mason-tool-installer.nvim",
+        dependencies = {
+			{ "mason-org/mason.nvim", opts = {} },
+        },
 		opts = {
 			ensure_installed = {
+                -- formatters
 				"clang-format",
 				"gersemi",
 				"shfmt",
 				"stylua",
 				"prettier",
 				"shellcheck",
+                "taplo",    -- toml
+                "tree-sitter-cli",
+
+                -- daps
+                "debugpy", "codelldb"
 			},
 			auto_update = true,
 		},
