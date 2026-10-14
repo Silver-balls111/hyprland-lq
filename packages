@@ -1,9 +1,11 @@
 rofi btop cava yazi nautilus mpv-mpris zed vim obsidian fuse2(for running appimages)
 bleachbit satty sddm qt5-declarative(for sddm theme) gnome-keyring(for zed auto login)
-7zip
+7zip noto-fonts noto-fonts-cjk(500mb) noto-fonts-emoji unzip(clangd lsp for nvim needs it)
+ninja lazygit unixodbc man-db qbittorrent reflector cmake ncdu rustup jdk-openjdk(for slint android)
+jdk21-openjdk(specifically jdk 21 for gradle to work) gradle wget(for mason kotlin-lsp)
 
 
-yay: zen-browser-bin heroic-games-launcer-bin
+yay: zen-browser-bin heroic-games-launcer-bin android-studio
 
 for sddm:
 - create main file /etc/sddm.conf

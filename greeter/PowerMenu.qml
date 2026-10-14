@@ -5,6 +5,9 @@ import Quickshell
 Item {
     id: root
     property bool open: false
+    // Adaptive foreground supplied by the greeter (wallpaper luminance) — used
+    // only at rest; the tinted hover/open fill restores the dark-on-light pair.
+    property color fgColor: Theme.fg
     signal wallpaperSaveRequested()
 
     implicitWidth: powerPill.implicitWidth
@@ -29,6 +32,7 @@ Item {
         id: powerPill
         anchors.bottom: parent.bottom
         anchors.right: parent.right
+        transparent: true
         active: root.open
         hpadding: 14
         onClicked: root.open = !root.open
@@ -37,7 +41,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             name: "power"
             iconSize: 18
-            iconColor: Theme.fg
+            iconColor: powerPill.filled ? Theme.fg : root.fgColor
         }
     }
 

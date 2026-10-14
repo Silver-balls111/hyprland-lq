@@ -6,6 +6,11 @@ Item {
     property var sessions: []
     property var currentSession: null
     property bool open: false
+    // Adaptive foregrounds supplied by the greeter (wallpaper luminance).
+    // Only used at rest — once the pill tints on hover/open the dark-on-light
+    // pair is correct again.
+    property color fgColor: Theme.fg
+    property color fgMutedColor: Theme.fgMuted
     signal sessionSelected(var session)
 
     implicitWidth: triggerPill.implicitWidth
@@ -16,20 +21,24 @@ Item {
         id: triggerPill
         anchors.bottom: parent.bottom
         anchors.left: parent.left
+        transparent: true
         active: root.open
         onClicked: root.open = !root.open
+
+        readonly property color contentFg: filled ? Theme.fg : root.fgColor
+        readonly property color contentFgMuted: filled ? Theme.fgMuted : root.fgMutedColor
 
         NIcon {
             anchors.verticalCenter: parent.verticalCenter
             name: "desktop"
             iconSize: 15
-            iconColor: Theme.fg
+            iconColor: triggerPill.contentFg
         }
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: root.currentSession ? root.currentSession.name : "Session"
-            color: Theme.fg
+            color: triggerPill.contentFg
             font.family: Theme.fontFamily
             font.pixelSize: Theme.textSize
         }
@@ -38,7 +47,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             name: root.open ? "chevronUp" : "chevronDown"
             iconSize: 12
-            iconColor: Theme.fgMuted
+            iconColor: triggerPill.contentFgMuted
         }
     }
 

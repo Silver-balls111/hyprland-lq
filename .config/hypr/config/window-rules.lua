@@ -118,6 +118,12 @@ hl.layer_rule({
     animation = "popin 80%"
 })
 
+hl.window_rule({
+    name    = "opaque-nautilus",
+    match   = { class = [[^org\.gnome\.Nautilus$]] },
+    opacity = "1.0 override 1.0 override 1.0 override", -- active, inactive, fullscreen
+})
+
 hl.layer_rule({
     name = "rofi",
     match = { namespace = "rofi" },

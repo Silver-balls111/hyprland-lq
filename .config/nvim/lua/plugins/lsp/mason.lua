@@ -18,6 +18,7 @@ return {
 				"bashls",
 				"ruff",
                 "qmlls",
+                "kotlin_lsp",
 			},
 		},
 	},
@@ -37,6 +38,7 @@ return {
 				"shellcheck",
                 "taplo",    -- toml
                 "tree-sitter-cli",
+                "ktfmt",
 
                 -- daps
                 "debugpy", "codelldb"

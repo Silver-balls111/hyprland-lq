@@ -6,6 +6,7 @@ return {
         require("nvim-treesitter").install({
             "c", "cpp", "python", "lua", "cmake", "bash", "json", "toml",
             "slint", "groovy", "dockerfile", "gitignore", "qmljs",
+            "kotlin",
         })
 
         -- filetype is "qml", parser is "qmljs"

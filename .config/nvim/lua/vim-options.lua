@@ -56,7 +56,7 @@ vim.api.nvim_create_autocmd("FileType", {
 -- auto show diagonistics
 vim.diagnostic.config({
     virtual_text = false,
-    virtual_lines = { current_line = true },
+    -- virtual_lines = { current_line = true },
     severity_sort = true,
     update_in_insert = false,
 })

@@ -6,7 +6,7 @@ hl.config({
         kb_layout          = "us",
         kb_variant         = "",
         kb_model           = "",
-        kb_options         = "",
+        kb_options         = "caps:ctrl_shifted_capslock",
         kb_rules           = "",
 
         follow_mouse       = 1,
@@ -38,13 +38,13 @@ hl.gesture({
 -- switch main mod key to win for my aula f75 :)
 hl.device({
     name       = "compx-2.4g-wireless-receiver",
-    kb_options = "altwin:swap_alt_win, caps:backspace",
+    kb_options = "altwin:swap_alt_win, caps:ctrl_shifted_capslock",
 })
 hl.device({
     name       = "aula-f75-5.0-kb-keyboard",
-    kb_options = "altwin:swap_alt_win, caps:backspace",
+    kb_options = "altwin:swap_alt_win, caps:ctrl_shifted_capslock",
 })
 hl.device({
     name       = "aula-f75-3.0-kb-keyboard",
-    kb_options = "altwin:swap_alt_win, caps:backspace",
+    kb_options = "altwin:swap_alt_win, caps:ctrl_shifted_capslock",
 })

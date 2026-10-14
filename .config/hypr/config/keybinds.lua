@@ -11,7 +11,8 @@ local mainMod = "ALT"
 ------ Application Launchers -------
 ------------------------------------
 hl.bind(mainMod .. " + RETURN", hl.dsp.exec_cmd(variables.terminal))
-hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(variables.alt_terminal .. " -e yazi"))   -- -e to run a command in terminal
+hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(variables.fileManager))
+hl.bind(mainMod .. " + T", hl.dsp.exec_cmd(variables.alt_fileManager))
 hl.bind(mainMod .. " + Z", hl.dsp.exec_cmd(variables.editor))
 hl.bind(mainMod .. " + C", hl.dsp.exec_cmd(variables.alt_editor))
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(variables.browser))
@@ -99,7 +100,7 @@ hl.bind(mainMod .. " + SHIFT + J", hl.dsp.window.swap({ direction = "b" }))
 ------------------------------------
 -- Switch to a submap called `resize`.
 hl.bind(mainMod .. " + R", function()
-    hl.dispatch(hl.dsp.submap("move"))
+    hl.dispatch(hl.dsp.submap("resize"))
     hl.notification.create({
         text = "Resize Mode [ON]",
         color = "rgb(40a02b)",
@@ -113,8 +114,8 @@ hl.define_submap("resize", function()
     -- Set repeating binds for resizing the active window.
     hl.bind("l", hl.dsp.window.resize({ x = 10, y = 0, relative = true}), { repeating = true })
     hl.bind("h", hl.dsp.window.resize({ x = -10, y = 0, relative = true}), { repeating = true })
-    hl.bind("k", hl.dsp.window.resize({ x = 0, y = 10, relative = true}), { repeating = true })
-    hl.bind("j", hl.dsp.window.resize({ x = 0, y = -10, relative = true}), { repeating = true })
+    hl.bind("k", hl.dsp.window.resize({ x = 0, y = -10, relative = true}), { repeating = true })
+    hl.bind("j", hl.dsp.window.resize({ x = 0, y = 10, relative = true}), { repeating = true })
 
     -- Use `reset` to go back to the global submap
     hl.bind("escape", function()

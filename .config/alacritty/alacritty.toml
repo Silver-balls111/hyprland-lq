@@ -32,7 +32,6 @@ shape = "Block"
 bindings = [
     { key = "v", mods = "Control", action = "Paste" },
     { key = "c", mods = "Control", action = "Copy" },
-    { key = "N", mods = "Control", action = "SpawnNewInstance" },
     { key = "C", mods = "Control|Shift", chars = "\x03"}
 ]
 

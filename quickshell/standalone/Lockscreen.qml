@@ -120,13 +120,12 @@ Item {
         && (batt.isLaptopBattery || batt.percentage > 0)
     readonly property bool battCharging: batt && batt.state === UPowerDeviceState.Charging
 
-    // only a PLAYING player gets the media card (parity with the old
-    // widget-box-color.sh transparent-when-paused behavior)
+    //no media card for now
     readonly property var activePlayer: {
         const list = Mpris.players.values;
+        return null;    //move 3 lines below to enable playing media card
         for (let i = 0; i < list.length; i++)
             if (list[i].playbackState === MprisPlaybackState.Playing) return list[i];
-        return null;
     }
     readonly property bool fakeMedia: testMode && Quickshell.env("LOCK_FAKE_MEDIA") === "1"
     readonly property var mediaPlayer: fakeMedia

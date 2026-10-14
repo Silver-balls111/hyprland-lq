@@ -32,6 +32,7 @@ return {
             yaml = { "prettier" },
             toml = { "taplo" },
             markdown = { "prettier" },
+            kotlin = { "ktfmt" },
 		},
 		default_format_opts = {
 			lsp_format = "fallback",
