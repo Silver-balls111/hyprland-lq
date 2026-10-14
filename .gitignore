@@ -1,1 +1,9 @@
 quickshell/.zcodeignore
+.config/alacritty/colors.toml
+.config/gtk-3.0/colors.css
+.config/gtk-4.0/colors.css
+.config/hypr/colors.lua
+.config/kitty/themes
+.config/yazi/theme.toml
+
+.gitignore
