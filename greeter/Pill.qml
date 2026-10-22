@@ -19,16 +19,25 @@ Rectangle {
     implicitHeight: Theme.pillHeight
     implicitWidth: innerRow.implicitWidth + (hpadding * 2)
     radius: height / 2
-    color: filled ? Theme.pillHover : (transparent ? "transparent" : Theme.pillBg)
-    border.width: (transparent && !filled) ? 0 : 1
-    border.color: Theme.border
+    color: filled
+        ? Qt.rgba(1, 1, 1, 0.18)
+        : (transparent ? "transparent" : Qt.rgba(1, 1, 1, 0.08))
+    border.width: 1
+    border.color: filled
+        ? Qt.rgba(1, 1, 1, 0.28)
+        : (transparent ? "transparent" : Qt.rgba(1, 1, 1, 0.14))
 
     Behavior on color { ColorAnimation { duration: 140 } }
+    Behavior on border.color { ColorAnimation { duration: 140 } }
 
     Row {
         id: innerRow
         anchors.centerIn: parent
         spacing: 8
+    }
+
+    TapHandler {
+        onTapped: root.clicked()
     }
 
     MouseArea {

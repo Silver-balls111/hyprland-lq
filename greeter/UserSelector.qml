@@ -11,22 +11,23 @@ Rectangle {
     property var users: []
     property string activeUser: ""
     property bool open: false
+    property color fgColor: Theme.fg
+    property bool wallDark: false
     signal userSelected(string username)
 
     visible: open && users.length > 0
     width: 240
-    height: userList.height + 20
+    height: userList.height + 10
     radius: Theme.popupRadius
-    color: Theme.popupBg
-    border.width: 1
-    border.color: Theme.border
+    color: "transparent"
+    border.width: 0
 
     ListView {
         id: userList
         x: 10
-        y: 10
+        y: 5
         width: parent.width - 20
-        height: Math.min(contentHeight, 3 * 44 + 2 * 4)
+        height: Math.min(3 * 44 + 2 * 4, root.users.length * 44 + Math.max(0, root.users.length - 1) * 4)
         clip: true
         model: root.users
         spacing: 4
@@ -37,13 +38,15 @@ Rectangle {
             required property var modelData
             required property int index
 
-            width: userList.width - 14
+            width: userList.width - (userList.interactive ? 14 : 0)
             height: 44
             radius: 12
             readonly property bool isCurrent: root.activeUser === modelData.name
             readonly property bool isHovered: uMouse.containsMouse
 
-            color: isCurrent ? Theme.pillHover : (isHovered ? Theme.rowHover : "transparent")
+            color: isCurrent
+                ? (root.wallDark ? Qt.rgba(1, 1, 1, 0.22) : Theme.pillHover)
+                : (isHovered ? (root.wallDark ? Qt.rgba(1, 1, 1, 0.12) : Theme.rowHover) : "transparent")
 
             Row {
                 anchors.fill: parent
@@ -51,20 +54,35 @@ Rectangle {
                 anchors.rightMargin: 10
                 spacing: 12
 
-                // Initial-letter avatar circle
-                Rectangle {
+                // Avatar with fallback to initial letter
+                Item {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 28
                     height: 28
-                    radius: 14
-                    color: Theme.userAvatarColor(modelData.name)
 
-                    Text {
-                        anchors.centerIn: parent
-                        text: modelData.name !== "" ? modelData.name.charAt(0) : "?"
-                        color: "#f2f2f2"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 14
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 14
+                        color: Theme.userAvatarColor(modelData.name)
+                        visible: uAvatar.imgStatus !== Image.Ready
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: modelData.name !== "" ? modelData.name.charAt(0).toUpperCase() : "?"
+                            color: "#f2f2f2"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 14
+                        }
+                    }
+
+                    RoundedImage {
+                        id: uAvatar
+                        anchors.fill: parent
+                        rounding: 14
+                        source: {
+                            if (modelData.avatar) return (modelData.avatar.startsWith("/") ? "file://" + modelData.avatar : modelData.avatar);
+                            return Qt.resolvedUrl("assets/pfp.png");
+                        }
                     }
                 }
 
@@ -73,7 +91,7 @@ Rectangle {
                     width: parent.width - 64
                     elide: Text.ElideRight
                     text: modelData.gecos || modelData.name
-                    color: Theme.fg
+                    color: root.fgColor
                     font.family: Theme.fontFamily
                     font.pixelSize: 14
                 }
@@ -82,8 +100,15 @@ Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     name: "check"
                     iconSize: 14
-                    iconColor: Theme.fg
+                    iconColor: root.fgColor
                     visible: isCurrent
+                }
+            }
+
+            TapHandler {
+                onTapped: {
+                    root.userSelected(modelData.name);
+                    root.open = false;
                 }
             }
 

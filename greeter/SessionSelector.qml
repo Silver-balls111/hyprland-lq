@@ -13,8 +13,8 @@ Item {
     property color fgMutedColor: Theme.fgMuted
     signal sessionSelected(var session)
 
-    implicitWidth: triggerPill.implicitWidth
-    implicitHeight: triggerPill.implicitHeight
+    width: open ? Math.max(triggerPill.implicitWidth, popup.width) : triggerPill.implicitWidth
+    height: open ? (triggerPill.implicitHeight + 10 + popup.height) : triggerPill.implicitHeight
 
     // Trigger pill in bottom-left
     Pill {
@@ -59,11 +59,11 @@ Item {
         anchors.bottomMargin: 10
         anchors.left: triggerPill.left
         width: Math.max(220, triggerPill.width + 40)
-        height: Math.min(260, sessionList.contentHeight + 20)
+        height: Math.min(260, (root.sessions.length * 38 + Math.max(0, root.sessions.length - 1) * 4) + 20)
         radius: Theme.popupRadius
-        color: Theme.popupBg
+        color: Qt.rgba(0, 0, 0, 0.40)
         border.width: 1
-        border.color: Theme.border
+        border.color: Qt.rgba(1, 1, 1, 0.18)
 
         // Swallower mouse area to prevent click-through
         MouseArea {
@@ -88,9 +88,11 @@ Item {
                 height: 38
                 radius: 12
                 readonly property bool isSelected: root.currentSession && root.currentSession.name === modelData.name
-                readonly property bool isHovered: itemMouse.containsMouse
+                readonly property bool isHovered: itemMouse.containsMouse || itemTap.pressed
 
-                color: isSelected ? Theme.pillHover : (isHovered ? Theme.rowHover : "transparent")
+                color: isSelected
+                    ? Qt.rgba(1, 1, 1, 0.22)
+                    : (isHovered ? Qt.rgba(1, 1, 1, 0.12) : "transparent")
 
                 Row {
                     anchors.fill: parent
@@ -102,7 +104,7 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         name: modelData.type === "wayland" ? "wayland" : "desktop"
                         iconSize: 14
-                        iconColor: isSelected ? Theme.fg : Theme.fgMuted
+                        iconColor: isSelected ? root.fgColor : root.fgMutedColor
                     }
 
                     Text {
@@ -110,7 +112,7 @@ Item {
                         width: parent.width - 50
                         elide: Text.ElideRight
                         text: modelData.name
-                        color: Theme.fg
+                        color: root.fgColor
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.textSize
                     }
@@ -119,8 +121,16 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         name: "check"
                         iconSize: 14
-                        iconColor: Theme.fg
+                        iconColor: root.fgColor
                         visible: isSelected
+                    }
+                }
+
+                TapHandler {
+                    id: itemTap
+                    onTapped: {
+                        root.sessionSelected(modelData);
+                        root.open = false;
                     }
                 }
 

@@ -1,7 +1,6 @@
 //@ pragma UseQApplication
 import QtQuick
 import Quickshell
-import Quickshell.Wayland
 
 ShellRoot {
     // Touch Colors first so Theme's md3 bindings resolve on a cold start
@@ -11,17 +10,13 @@ ShellRoot {
     Variants {
         model: Quickshell.screens
 
-        PanelWindow {
+        FloatingWindow {
             id: win
             property var modelData
             screen: modelData
 
-            anchors { left: true; right: true; top: true; bottom: true }
-            exclusiveZone: -1
+            fullscreen: true
             color: "#000000"
-            WlrLayershell.layer: WlrLayer.Overlay
-            WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-            WlrLayershell.namespace: "quickshell:greeter"
 
             Greeter {
                 anchors.fill: parent

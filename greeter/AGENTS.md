@@ -9,11 +9,12 @@ already paid for.
 
 ## What this is
 
-A **greetd greeter** built with Quickshell QML, run by a minimal Hyprland
-compositor instance: `greetd.service` → `start-hyprland -- -c
-/etc/greetd/hyprland.lua` → `quickshell -p /etc/greetd/greeter/shell.qml`.
-When login succeeds, quickshell exits; the compositor's autostart then runs
-`hyprctl dispatch 'hl.dsp.exit()'` and greetd starts the user session.
+A **greetd greeter** built with Quickshell QML, run by the lightweight **Cage**
+kiosk compositor: `greetd.service` → `sh -c 'exec cage -s -d -- quickshell -p /etc/greetd/greeter/shell.qml >/dev/null 2>&1'`.
+When login succeeds, quickshell exits; Cage automatically terminates as its
+child application closes, and greetd launches the user session (`start-hyprland`).
+Cage starts in ~100ms with zero window manager overhead, and stdout/stderr redirection
+silences TTY text output. (A minimal `hyprland.lua` is kept in repo as a fallback compositor option).
 
 Live copy is `/etc/greetd/greeter/` — the repo dir is the source; **changes
 only take effect on the real greeter after `sudo ./greeter/install.sh`**.
@@ -25,48 +26,35 @@ mode, see gotchas).
 
 | File | Role |
 |---|---|
-| `shell.qml` | Entry point. One fullscreen Overlay `PanelWindow` per screen, `Exclusive` keyboard focus, namespace `quickshell:greeter`. `//@ pragma UseQApplication` required. |
+| `shell.qml` | Entry point. One fullscreen `FloatingWindow` per screen (Cage is an XDG toplevel kiosk and does not implement `wlr-layer-shell`). `//@ pragma UseQApplication` required. |
 | `Greeter.qml` | Everything: clock/date, battery, background + luminance sampler, user/password center column, Greetd auth state machine, wallpaper/user/session discovery Processes, state persistence (`/var/cache/greetd/last-user`, `last-session`). |
 | `UserSelector.qml` | **Dropdown panel** (not a modal) placed in the center Column between the user pill and the password field. 3 rows visible, scrollable beyond (delegates 14px narrower than the list — scrollbar lane convention). |
-| `SessionSelector.qml` | Bottom-left Pill + popup listing wayland/x11 sessions from `/usr/share/{wayland-sessions,xsessions}/*.desktop`. |
-| `PowerMenu.qml` | Bottom-right Pill + popup: poweroff/reboot/suspend/hibernate via `Quickshell.execDetached(["systemctl", ...])`. |
+| `SessionSelector.qml` | Bottom-left Pill + popup listing wayland/x11 sessions from `/usr/share/{wayland-sessions,xsessions}/*.desktop`. Transparent at rest, blends into wallpaper with adaptive `lockFg`/`lockFgMuted`. |
+| `PowerMenu.qml` | Bottom-right Pill + popup: poweroff/reboot/suspend/hibernate via `Quickshell.execDetached(["systemctl", ...])`. Transparent at rest, blends into wallpaper with adaptive `lockFg`. |
 | `Theme.qml` | Same matugen role mapping as the bar's Theme (`Colors.md3` via `Colors.qml`) + `userAvatarColor(name)` — deterministic muted HSL per username for the initial-letter avatars. |
 | `Colors.qml` | FileView + JsonAdapter of matugen `colors.json`. Preview uses `$HOME/.local/state/quickshell/generated/colors.json`; the real greeter reads `/var/cache/greetd/colors.json` (copied on wallpaper apply). |
-| `Icons.qml` / `NIcon.qml` / `Pill.qml` / `RoundedImage.qml` | Same roles as the bar's. `RoundedImage` is currently unused (initial-letter avatars replaced photo avatars 2026-10-08) but stays as a primitive; it is still in `qmldir`. |
+| `Icons.qml` / `NIcon.qml` / `Pill.qml` / `RoundedImage.qml` | Same roles as the bar's. `RoundedImage` renders circular avatar photos (`assets/pfp.png` or `~/.face`), falling back to initial-letter circle if missing. `Pill` supports `transparent: true` at rest with animated hover/open tint. |
 | `qmldir` | Every component must be listed (singletons + types) — same rule as the bar. |
-| `install.sh` | Root install: copies to `/etc/greetd`, makes `/var/cache/greetd` world-writable, **grants greeter-user ACLs for the wallpaper symlink**, removes legacy copy-flow artifacts. |
-| `save-wallpaper.sh` | One-shot: point `/var/cache/greetd/wallpaper` at the current awww wallpaper. |
-| `config.toml` / `hyprland.lua` / `hyprland.conf` | greetd config + the minimal compositor configs (Lua is the live one per config.toml; the .conf is the legacy syntax twin). |
-| `assets/` | `wallpaper.jpg` fallback background, `pfp.png` legacy avatar. |
+| `install.sh` | Root install: copies to `/etc/greetd`, makes `/var/cache/greetd` world-writable, sets traversal ACLs (`setfacl -m u:greeter:--x /home/*` and `u:greeter:rX /home/*/Pictures`), adds greeter user to `video` and `input` groups, symlinks initial wallpaper. |
+| `save-wallpaper.sh` | One-shot: point `/var/cache/greetd/wallpaper` (atomic symlink swap) to current awww wallpaper. |
+| `config.toml` / `hyprland.lua` / `hyprland.conf` | greetd config (Cage command) + fallback compositor configs (`hyprland.lua` uses valid `hl.config({ ... })` API). |
+| `assets/` | `wallpaper.jpg` fallback background, `pfp.png` user avatar. |
 
-## Wallpaper: symlink, never copy (2026-10-08 rewrite)
+## Wallpaper: atomic symlink (`/var/cache/greetd/wallpaper`)
 
-The old flow copied the wallpaper image to `/var/cache/greetd/wallpaper.png`
-on every change — wasteful and stale-prone. Current flow:
+The login screen reads `/var/cache/greetd/wallpaper`, which is an atomic symlink pointing directly to the active wallpaper in the user's home (e.g. `/home/<user>/Pictures/wallpapers/...`).
+- No image data is copied, preserving disk writes and keeping switches instantaneous.
+- **Atomic updates**: `Actions.applyWallpaper` and `Actions.syncGreetdWallpaper()` in `quickshell/core/Actions.qml` update the symlink via `ln -sfn "$WALL" /var/cache/greetd/.wallpaper.tmp && mv -Tf ... /var/cache/greetd/wallpaper`.
+- **Permissions**: `install.sh` grants user `greeter` directory traversal permissions on `/home/<user>` (`setfacl -m u:greeter:--x`) and read permissions on `/home/<user>/Pictures` (`setfacl -R -m u:greeter:rX`), enabling `greeter` to read the symlinked target directly without copying.
+- **Rendering**: The wallpaper is rendered crisp and unblurred in full native resolution (no full-screen blur `MultiEffect`).
+- In preview mode, the greeter resolves `/var/cache/greetd/wallpaper` directly or falls back to `awww query` / `assets/wallpaper.jpg`.
 
-- The **user session** (bar) owns the link: `Actions.applyWallpaper` in
-  `quickshell/core/Actions.qml` and `Actions.syncGreetdWallpaper()` (called
-  from PowerPopup before power actions) re-point
-  `/var/cache/greetd/wallpaper` at the awww wallpaper with an **atomic swap**:
-  `ln -sfn "$1" /var/cache/greetd/.wallpaper.tmp && mv -Tf ... wallpaper`.
-  Build-then-rename, so the greeter never observes a half-written link.
-  The same apply also copies matugen's `colors.json` to
-  `/var/cache/greetd/colors.json` so popup/pill colors match the bar.
-  The same apply also copies matugen's `colors.json` to
-  `/var/cache/greetd/colors.json` so popup/pill colors match the bar.
-- The **greeter** resolves, in order: the symlink → legacy
-  `wallpaper-path` file → `/tmp/greetd-wallpaper.png` → bundled
-  `assets/wallpaper.jpg`. `[ -f symlink ]` follows the link, so a dangling
-  link falls through to fallbacks.
-- Permissions are the whole trick: `/home/<user>` is `0700`, and the greeter
-  runs as user `greeter` — it can't traverse into the home to read the
-  target. `install.sh` grants `u:greeter:--x` on each `/home/*` (traverse
-  only, no listing) and `rX` + default ACLs on `~/Pictures/wallpapers` so
-  future wallpapers stay readable. Hardlinks were rejected: `/var/cache` and
-  `/home` are different filesystems here.
-- If the greeter ever shows the fallback wallpaper on a real boot, check
-  `sudo -u greeter cat /var/cache/greetd/wallpaper` and the ACLs
-  (`getfacl /home/<user>`), not the QML.
+## User Avatar (pfp.png and ~/.face)
+
+The avatar circle in `Greeter.qml` and `UserSelector.qml` displays:
+1. Per-user avatar if `~/.face` or `~/.face.icon` exists.
+2. Otherwise, `assets/pfp.png` (place your avatar at `greeter/assets/pfp.png`, which installs to `/etc/greetd/greeter/assets/pfp.png`).
+3. If no image exists or it fails to load, falls back to the deterministic initial-letter circle with `Theme.userAvatarColor`.
 
 ## Auth flow & the "Login Failed" contract (user-specified — do not decorate)
 
@@ -88,11 +76,14 @@ on every change — wasteful and stale-prone. Current flow:
   `Greetd.launch(cmdList, env, true)`. Session exec strings are split on
   whitespace; env gets `XDG_SESSION_TYPE` (+ Hyprland desktop vars for
   wayland Hyprland sessions).
-- Users with real avatars (`.face` files) exist in the model but avatars are
-  NOT displayed anymore — initial-letter circles only.
 
 ## Popup conventions
 
+- **Bounding Box Sizing**: `SessionSelector` and `PowerMenu` dynamically expand
+  their `width` and `height` to encompass the popup panel when open (`height: open ? pill.height + 10 + popup.height : pill.height`).
+  If an Item's bounds don't enclose its popups, Qt Quick's `contains()` returns
+  false for clicks outside the trigger pill, and the root-level outside-click
+  dismisser (`z: 40`) swallows the click and immediately closes the popup!
 - The center column (`z: 50`) sits ABOVE the outside-click dismisser
   (`z: 40`), which is enabled only while any popup is open — so the user
   pill and open dropdown keep their clicks.
@@ -103,7 +94,10 @@ on every change — wasteful and stale-prone. Current flow:
   buffer.
 - The user dropdown lives **inside the center Column** (not an overlay), so
   the password field shifts down only while it's open — matches the
-  reference mockup; don't move it to a centered modal.
+  reference mockup; don't move it to a centered modal. It has no solid background
+  and blends into the wallpaper with adaptive contrast.
+- **Touchpad Tap-to-Click**: Because Cage kiosk does not map touchpad tap gestures to mouse button events by default, all clickable controls (`Pill`, `SessionSelector` / `PowerMenu` / `UserSelector` delegates, submit button, and root dismisser) use Qt Quick `TapHandler` alongside `MouseArea` to ensure single-finger tap gestures fire reliably.
+- **Frosted Button & Popup Styling**: Buttons and popups use frosted glass styling (`Qt.rgba(1, 1, 1, 0.08)` / `Qt.rgba(0, 0, 0, 0.40)` with `Qt.rgba(1, 1, 1, 0.18)` borders) rather than opaque theme palette colors.
 
 ## Gotchas
 
@@ -138,5 +132,7 @@ on every change — wasteful and stale-prone. Current flow:
 - Scrollable lists keep the 14px scrollbar lane; pills/popups reuse
   `Pill`/Theme tokens rather than ad-hoc styling.
 - The clock matches the lockscreen: `y = height * 0.10`, time/AMPM 75px.
-- Long passwords: dots live in a clipped horizontal Flickable that leaves
-  a reserved lane for the submit arrow and auto-scrolls to the newest dot.
+- Long passwords: dots match `quickshell/standalone/Lockscreen.qml` with 10px diameter, `spacing: 3`, `lockFgMuted` at 0.9 opacity, in a clipped horizontal Flickable that leaves a reserved lane for the submit arrow. Note: manual horizontal scrolling / flicking on the dots does not work reliably in this layer-shell environment; documented per user instruction — do not attempt to fix.
+- **Wallpaper Blur**: Wallpaper uses the exact same `MultiEffect` blur as `Lockscreen.qml` (`blurMax: 64`, `blur: 1.0`, `anchors.margins: -64`) over the full-resolution image without downsampling.
+- **Qt Platform (`QT_QPA_PLATFORM=wayland`)**: Running quickshell on a TTY or kiosk without setting `QT_QPA_PLATFORM=wayland` causes Qt to look for an X11 display and fail with `Could not load the Qt platform plugin "xcb" in "" even though it was found`. Greetd's `config.toml` must explicitly export `QT_QPA_PLATFORM=wayland`.
+- **Compositor and Tap-to-Click**: Cage is a barebones kiosk compositor that does not configure libinput tap-to-click (physical clicks work, but tap gestures are ignored by libinput). For full touchpad tap-to-click support, `hyprland.lua` and `hyprland.conf` include `touchpad { tap_to_click = true }`.

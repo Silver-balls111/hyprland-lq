@@ -17,7 +17,7 @@ Item {
     property bool wallDark: false
 
     readonly property color lockFg: wallDark ? "#f2f2f2" : Theme.fg
-    readonly property color lockFgMuted: wallDark ? Qt.rgba(1, 1, 1, 0.70) : Theme.fgMuted
+    readonly property color lockFgMuted: wallDark ? Qt.rgba(1, 1, 1, 0.62) : Theme.fgMuted
 
     // ── Auth state ─────────────────────────────────────────────────────────
     property string buffer: ""
@@ -229,15 +229,16 @@ Item {
     Process { id: stateSaverProc; command: [] }
 
     // ── Wallpaper discovery process ────────────────────────────────────────
-    // The user session re-points /var/cache/greetd/wallpaper (a symlink) at
-    // the current awww wallpaper on every change — no image is ever copied.
-    // The remaining entries are legacy fallbacks from the old copy-based flow.
+    // Live system reads /var/cache/greetd/wallpaper (copied directly with mode 644).
+    // In preview mode or fallbacks, query awww or search ~/Pictures/wallpapers.
     Process {
         id: wallpaperFinderProc
         command: ["sh", "-c",
             'p=""; ' +
             'if [ -f /var/cache/greetd/wallpaper ]; then ' +
             '    p=/var/cache/greetd/wallpaper; ' +
+            'elif command -v awww >/dev/null 2>&1 && [ -n "$(awww query 2>/dev/null)" ]; then ' +
+            '    p=$(awww query 2>/dev/null | grep -oP "(?<=image: ).*" | head -n 1 || true); ' +
             'elif [ -f /var/cache/greetd/wallpaper-path ] && [ -f "$(cat /var/cache/greetd/wallpaper-path 2>/dev/null)" ]; then ' +
             '    p=$(cat /var/cache/greetd/wallpaper-path); ' +
             'elif [ -f /tmp/greetd-wallpaper.png ]; then ' +
@@ -343,9 +344,9 @@ Item {
                         picked = root.sessions.find(s => s.name === data.lastSession);
                     }
                     if (!picked) {
-                        // Default preference: Hyprland (uwsm) or Hyprland
-                        picked = root.sessions.find(s => s.name === "Hyprland (uwsm-managed)")
-                            || root.sessions.find(s => s.name === "Hyprland")
+                        // Default preference: Hyprland, then Hyprland (uwsm-managed)
+                        picked = root.sessions.find(s => s.name === "Hyprland")
+                            || root.sessions.find(s => s.name === "Hyprland (uwsm-managed)")
                             || (root.sessions.length > 0 ? root.sessions[0] : { name: "Hyprland", exec: "/usr/bin/start-hyprland", type: "wayland" });
                     }
                     root.currentSession = picked;
@@ -363,7 +364,7 @@ Item {
         sessionsProbe.running = true;
     }
 
-    // ── Background: blurred wallpaper ──────────────────────────────────────
+    // ── Background: blurred wallpaper (matching Lockscreen.qml) ───────────
     Rectangle { anchors.fill: parent; color: "#000000" }
 
     Image {
@@ -375,8 +376,6 @@ Item {
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
         cache: true
-        sourceSize.width: Math.max(128, Math.round((root.width + 128) / 128) * 128)
-        sourceSize.height: 0
     }
 
     MultiEffect {
@@ -385,12 +384,6 @@ Item {
         blurEnabled: true
         blurMax: 64
         blur: 1.0
-    }
-
-    // Subtle dark vignette overlay for legibility
-    Rectangle {
-        anchors.fill: parent
-        color: Qt.rgba(0, 0, 0, 0.22)
     }
 
     // ── Luminance sampler for adaptive contrast ────────────────────────────
@@ -524,24 +517,37 @@ Item {
         // dropdown keep receiving clicks while it is enabled
         z: 50
 
-        // Initial-letter avatar (colored circle, no photo / ring)
+        // Profile photo with smooth circle rounding, falling back to initial-letter circle
         Item {
             anchors.horizontalCenter: parent.horizontalCenter
             width: 80
             height: 80
 
+            // Initial-letter fallback circle
             Rectangle {
                 anchors.fill: parent
                 radius: 40
                 color: Theme.userAvatarColor(root.currentUser)
+                visible: avatarImg.imgStatus !== Image.Ready
+
+                Text {
+                    anchors.centerIn: parent
+                    text: root.currentUser !== "" ? root.currentUser.charAt(0).toUpperCase() : "?"
+                    color: "#f2f2f2"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 36
+                }
             }
 
-            Text {
-                anchors.centerIn: parent
-                text: root.currentUser !== "" ? root.currentUser.charAt(0) : "?"
-                color: "#f2f2f2"
-                font.family: Theme.fontFamily
-                font.pixelSize: 36
+            RoundedImage {
+                id: avatarImg
+                anchors.fill: parent
+                rounding: 40
+                source: {
+                    const u = root.users.find(x => x.name === root.currentUser);
+                    if (u && u.avatar) return (u.avatar.startsWith("/") ? "file://" + u.avatar : u.avatar);
+                    return Qt.resolvedUrl("assets/pfp.png");
+                }
             }
         }
 
@@ -550,11 +556,15 @@ Item {
             id: userPill
             anchors.horizontalCenter: parent.horizontalCenter
             active: userSelector.open
+            transparent: true
             onClicked: {
                 sessionSelector.open = false;
                 powerMenu.open = false;
                 userSelector.open = !userSelector.open;
             }
+
+            readonly property color contentFg: filled ? Theme.fg : root.lockFg
+            readonly property color contentFgMuted: filled ? Theme.fgMuted : root.lockFgMuted
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
@@ -562,7 +572,7 @@ Item {
                     const u = root.users.find(x => x.name === root.currentUser);
                     return u ? (u.gecos || u.name) : root.currentUser;
                 }
-                color: Theme.fg
+                color: userPill.contentFg
                 font.family: Theme.fontFamily
                 font.pixelSize: 16
             }
@@ -571,7 +581,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 name: userSelector.open ? "chevronUp" : "chevronDown"
                 iconSize: 12
-                iconColor: Theme.fgMuted
+                iconColor: userPill.contentFgMuted
             }
         }
 
@@ -582,6 +592,8 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             users: root.users
             activeUser: root.currentUser
+            fgColor: root.lockFg
+            wallDark: root.wallDark
             onOpenChanged: {
                 if (open) {
                     sessionSelector.open = false;
@@ -602,9 +614,9 @@ Item {
                 id: fieldBackground
                 anchors.fill: parent
                 radius: 25
-                color: Theme.inputBg
+                color: root.wallDark ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(0, 0, 0, 0.08)
                 border.width: 1
-                border.color: Theme.border
+                border.color: root.wallDark ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(0, 0, 0, 0.14)
                 clip: true
 
                 // Submit arrow — reserved lane on the right so dots never
@@ -617,7 +629,11 @@ Item {
                     width: 34
                     height: 34
                     radius: 17
-                    color: submitMouse.containsMouse ? Theme.pillHover : Theme.pillBg
+                    color: (submitMouse.containsMouse || submitTap.pressed)
+                        ? Qt.rgba(1, 1, 1, 0.28)
+                        : Qt.rgba(1, 1, 1, 0.16)
+                    border.width: 1
+                    border.color: Qt.rgba(1, 1, 1, 0.22)
                     visible: root.buffer.length > 0 && root.authState !== "launching"
                     z: 2
 
@@ -625,7 +641,12 @@ Item {
                         anchors.centerIn: parent
                         name: "arrowRight"
                         iconSize: 14
-                        iconColor: Theme.fg
+                        iconColor: root.lockFg
+                    }
+
+                    TapHandler {
+                        id: submitTap
+                        onTapped: root.submit()
                     }
 
                     MouseArea {
@@ -647,18 +668,40 @@ Item {
                     height: 16
                     clip: true
                     visible: root.buffer.length > 0 && root.authState !== "launching"
-                    contentWidth: Math.max(width, dotsRow.implicitWidth)
+
+                    readonly property real dotsWidth: root.buffer.length > 0 ? (root.buffer.length * 13 - 3) : 0
+                    contentWidth: Math.max(width, dotsWidth)
                     contentHeight: height
                     flickableDirection: Flickable.HorizontalFlick
                     boundsBehavior: Flickable.StopAtBounds
                     interactive: contentWidth > width
 
+                    function scrollToEnd() {
+                        if (dotsWidth > width)
+                            contentX = dotsWidth - width;
+                        else
+                            contentX = 0;
+                    }
+
+                    onDotsWidthChanged: scrollToEnd()
+                    onWidthChanged: scrollToEnd()
+
+                    WheelHandler {
+                        target: dotsFlick
+                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                        onWheel: event => {
+                            const delta = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x;
+                            dotsFlick.contentX = Math.max(0, Math.min(dotsFlick.contentWidth - dotsFlick.width, dotsFlick.contentX - delta));
+                        }
+                    }
+
                     Row {
                         id: dotsRow
-                        spacing: 5
+                        spacing: 3
                         height: parent.height
-                        x: implicitWidth < dotsFlick.width
-                            ? Math.round((dotsFlick.width - implicitWidth) / 2) : 0
+                        width: dotsFlick.dotsWidth
+                        x: width < dotsFlick.width
+                            ? Math.round((dotsFlick.width - width) / 2) : 0
 
                         Repeater {
                             model: root.buffer.length
@@ -667,24 +710,10 @@ Item {
                                 width: 10
                                 height: 10
                                 radius: 5
-                                color: root.lockFg
-                                opacity: 0.95
+                                color: root.lockFgMuted
+                                opacity: 0.9
                             }
                         }
-                    }
-
-                    function scrollToEnd() {
-                        if (contentWidth > width)
-                            contentX = contentWidth - width;
-                        else
-                            contentX = 0;
-                    }
-                }
-
-                Connections {
-                    target: root
-                    function onBufferChanged() {
-                        Qt.callLater(dotsFlick.scrollToEnd);
                     }
                 }
 
@@ -732,7 +761,7 @@ Item {
         }
     }
 
-    // ── Outside click dismisser for popups ─────────────────────────────────
+    // ── Outside click / tap dismisser for popups ───────────────────────────
     MouseArea {
         anchors.fill: parent
         enabled: sessionSelector.open || powerMenu.open || userSelector.open
@@ -742,6 +771,14 @@ Item {
             sessionSelector.open = false;
             powerMenu.open = false;
             userSelector.open = false;
+        }
+
+        TapHandler {
+            onTapped: {
+                sessionSelector.open = false;
+                powerMenu.open = false;
+                userSelector.open = false;
+            }
         }
     }
 
@@ -754,6 +791,8 @@ Item {
         anchors.margins: 28
         sessions: root.sessions
         currentSession: root.currentSession
+        fgColor: root.lockFg
+        fgMutedColor: root.lockFgMuted
         onOpenChanged: if (open) userSelector.open = false;
         onSessionSelected: sess => {
             root.currentSession = sess;
@@ -768,6 +807,7 @@ Item {
         anchors.bottom: parent.bottom
         anchors.right: parent.right
         anchors.margins: 28
+        fgColor: root.lockFg
         onOpenChanged: if (open) userSelector.open = false;
         onWallpaperSaveRequested: {
             root.saveLastState();

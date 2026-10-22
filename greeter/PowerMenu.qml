@@ -10,8 +10,8 @@ Item {
     property color fgColor: Theme.fg
     signal wallpaperSaveRequested()
 
-    implicitWidth: powerPill.implicitWidth
-    implicitHeight: powerPill.implicitHeight
+    width: open ? Math.max(powerPill.implicitWidth, popup.width) : powerPill.implicitWidth
+    height: open ? (powerPill.implicitHeight + 10 + popup.height) : powerPill.implicitHeight
 
     // Power action model
     readonly property var actions: [
@@ -55,9 +55,9 @@ Item {
         width: 190
         height: actionColumn.implicitHeight + 20
         radius: Theme.popupRadius
-        color: Theme.popupBg
+        color: Qt.rgba(0, 0, 0, 0.40)
         border.width: 1
-        border.color: Theme.border
+        border.color: Qt.rgba(1, 1, 1, 0.18)
 
         MouseArea {
             anchors.fill: parent
@@ -80,8 +80,8 @@ Item {
                     width: actionColumn.width
                     height: 38
                     radius: 12
-                    readonly property bool isHovered: rowMouse.containsMouse
-                    color: isHovered ? Theme.rowHover : "transparent"
+                    readonly property bool isHovered: rowMouse.containsMouse || rowTap.pressed
+                    color: isHovered ? Qt.rgba(1, 1, 1, 0.14) : "transparent"
 
                     Row {
                         anchors.fill: parent
@@ -93,13 +93,13 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             name: modelData.icon
                             iconSize: 16
-                            iconColor: modelData.key === "s" ? Theme.danger : Theme.fg
+                            iconColor: modelData.key === "s" ? Theme.danger : root.fgColor
                         }
 
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             text: modelData.label
-                            color: Theme.fg
+                            color: root.fgColor
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.textSize
                         }
@@ -109,6 +109,11 @@ Item {
                             width: 1
                             height: 1
                         }
+                    }
+
+                    TapHandler {
+                        id: rowTap
+                        onTapped: root.executeAction(modelData)
                     }
 
                     MouseArea {

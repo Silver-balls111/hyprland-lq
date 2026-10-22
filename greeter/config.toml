@@ -2,5 +2,5 @@
 vt = 1
 
 [default_session]
-command = "start-hyprland -- -c /etc/greetd/hyprland.lua"
+command = "sh -c 'export QT_QPA_PLATFORM=wayland XDG_SESSION_TYPE=wayland; exec cage -s -d -- quickshell -p /etc/greetd/greeter/shell.qml'"
 user = "greeter"

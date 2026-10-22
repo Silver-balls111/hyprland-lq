@@ -28,17 +28,42 @@ chmod 644 /etc/greetd/hyprland.conf
 chmod 644 /etc/greetd/hyprland.lua
 chmod -R a+rX /etc/greetd/greeter
 
-# Add greeter user to video group if not already
+# Add greeter user to video and input groups if not already
 if id "greeter" &>/dev/null; then
-    usermod -a -G video greeter 2>/dev/null || true
+    usermod -a -G video,input greeter 2>/dev/null || true
 fi
 
 echo "==> Greeter wallpaper state..."
-# The user session re-points /var/cache/greetd/wallpaper (a symlink) at the
-# current awww wallpaper on every change — the greeter reads through it, no
-# image copies. Remove legacy artifacts from the old copy-based flow.
-rm -f /var/cache/greetd/wallpaper.png /var/cache/greetd/wallpaper-path 2>/dev/null || true
-rm -f /tmp/greetd-wallpaper.png 2>/dev/null || true
+# Point /var/cache/greetd/wallpaper (symlink) to current wallpaper
+# and grant user greeter ACLs to traverse /home/<user> and read Pictures.
+WALL_SRC=""
+if command -v awww &>/dev/null; then
+    WALL_SRC=$(awww query 2>/dev/null | grep -oP '(?<=image: ).*' | head -n 1 || true)
+fi
+if [ -z "$WALL_SRC" ] || [ ! -f "$WALL_SRC" ]; then
+    for uhome in /home/*; do
+        if [ -d "$uhome/Pictures/wallpapers" ]; then
+            WALL_SRC=$(find "$uhome/Pictures/wallpapers" -type f \( -name "*.jpg" -o -name "*.png" \) 2>/dev/null | head -n 1 || true)
+            [ -n "$WALL_SRC" ] && break
+        fi
+    done
+fi
+if [ -n "$WALL_SRC" ] && [ -f "$WALL_SRC" ]; then
+    ln -sfn "$WALL_SRC" /var/cache/greetd/.wallpaper.tmp
+    mv -Tf /var/cache/greetd/.wallpaper.tmp /var/cache/greetd/wallpaper
+    echo "    Symlinked wallpaper -> $WALL_SRC"
+fi
+
+# Ensure user greeter can traverse into user homes and read wallpapers
+for uhome in /home/*; do
+    if [ -d "$uhome" ]; then
+        setfacl -m u:greeter:--x "$uhome" 2>/dev/null || true
+        if [ -d "$uhome/Pictures" ]; then
+            setfacl -R -m u:greeter:rX "$uhome/Pictures" 2>/dev/null || true
+            setfacl -R -d -m u:greeter:rX "$uhome/Pictures" 2>/dev/null || true
+        fi
+    fi
+done
 
 echo "==> Seeding matugen palette for the greeter..."
 # The greeter user cannot read ~/.local/state, so the bar copies colors.json
@@ -51,25 +76,6 @@ for f in /home/*/.local/state/quickshell/generated/colors.json; do
         break
     fi
 done
-
-echo "==> Granting the greeter user read access to wallpapers..."
-# Homes are 0700, so the 'greeter' user needs an ACL to traverse into them
-# and read the wallpaper files the symlink points at. Only the greeter user
-# is granted anything, and only traverse (x) on the home itself.
-if command -v setfacl &>/dev/null; then
-    for uhome in /home/*; do
-        [ -d "$uhome" ] || continue
-        setfacl -m u:greeter:--x "$uhome" 2>/dev/null || true
-        if [ -d "$uhome/Pictures/wallpapers" ]; then
-            setfacl -R -m u:greeter:rX "$uhome/Pictures/wallpapers" 2>/dev/null || true
-            # Default ACL: future wallpapers stay readable for the greeter
-            setfacl -d -m u:greeter:rX "$uhome/Pictures/wallpapers" 2>/dev/null || true
-        fi
-    done
-else
-    echo "    setfacl not found — install the 'acl' package, otherwise the"
-    echo "    greeter cannot follow the wallpaper symlink into /home."
-fi
 
 echo "==> Installation complete!"
 echo "To test the greeter UI without logging out, run:"

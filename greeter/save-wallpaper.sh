@@ -19,10 +19,10 @@ fi
 
 if [ -n "$WALLPAPER" ] && [ -f "$WALLPAPER" ]; then
     if mkdir -p "$CACHE_DIR" 2>/dev/null && [ -w "$CACHE_DIR" ]; then
-        # Atomic swap: build the link under a temp name, then rename over
+        # Atomically point symlink to active wallpaper
         ln -sfn "$WALLPAPER" "$CACHE_DIR/.wallpaper.tmp"
         mv -Tf "$CACHE_DIR/.wallpaper.tmp" "$LINK"
-        echo "Greeter wallpaper -> $WALLPAPER"
+        echo "Greeter wallpaper updated (symlinked -> $WALLPAPER)"
     else
         echo "Cannot write to $CACHE_DIR — run 'sudo ./greeter/install.sh' first" >&2
         exit 1
