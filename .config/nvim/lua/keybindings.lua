@@ -4,6 +4,10 @@ local map = vim.keymap.set
 
 map("i", "jj", "<Esc>")
 
+-- Basic keymap
+map('n', '<C-s>', ':w<CR>', { desc = 'Save file' })
+map('n', '<leader>q', ':q<CR>', { noremap = true, silent = true, desc = 'Quit' })
+
 -- ':NvimTreeToggle<CR>',
 map('n', '<C-n>', '<cmd>Neotree toggle reveal<CR>', { silent = true })
 

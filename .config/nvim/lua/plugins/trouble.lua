@@ -1,5 +1,8 @@
 return {
     "folke/trouble.nvim",
+    dependencies = {
+          "folke/todo-comments.nvim",
+    },
     opts = {
         focus = true,
         keys = {
@@ -35,6 +38,11 @@ return {
             "<leader>xX",
             "<cmd>Trouble diagnostics toggle<cr>",
             desc = "Diagnostics (all)",
+        },
+        {
+            "<leader>xt",
+            "<cmd>Trouble todo<cr>",
+            desc = "Show TODO's",
         },
     },
 }

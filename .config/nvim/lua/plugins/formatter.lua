@@ -28,17 +28,20 @@ return {
 			sh = { "shfmt" },
 			bash = { "shfmt" },
 			qml = { "qmlformat" },
-            json = { "prettier" },
-            yaml = { "prettier" },
-            toml = { "taplo" },
-            markdown = { "prettier" },
-            kotlin = { "ktfmt" },
+			json = { "prettier" },
+			yaml = { "prettier" },
+			toml = { "taplo" },
+			markdown = { "prettier" },
+			kotlin = { "ktfmt" },
 		},
 		default_format_opts = {
 			lsp_format = "fallback",
 		},
 		-- format_on_save = { timeout_ms = 500 },
 		formatters = {
+			["clang-format"] = {
+				prepend_args = { "--style={IndentWidth: 4}" },
+			},
 			shfmt = {
 				append_args = { "-i", "2" },
 			},

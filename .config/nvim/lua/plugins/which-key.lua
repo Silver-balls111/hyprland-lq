@@ -3,10 +3,10 @@ return {
 	event = "VeryLazy",
 	init = function()
 		vim.o.timeout = true
-		vim.o.timeoutlen = 500
+		vim.o.timeoutlen = 1000
 	end,
 	opts = {
-		delay = 500,
+		delay = 1000,
 		spec = {
 			{ "<leader>s", group = "split" },
 			{ "<leader>t", group = "tab / terminal / toggle" },
