@@ -68,6 +68,12 @@ output_path = '~/.config/yazi/theme.toml'
 [templates.zed]
 input_path = '~/.config/matugen/templates/zed-colors.json'
 output_path = '~/.config/zed/themes/matugen.json'
+
+[templates.vicinae]
+input_path = '~/.config/matugen/templates/vicinae.toml'
+output_path = '~/.local/share/vicinae/themes/matugen.toml'
+post_hook = 'vicinae theme set matugen'
+
 # No Longer in use
 #
 # [templates.neovim]

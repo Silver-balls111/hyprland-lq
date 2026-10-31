@@ -16,7 +16,8 @@ hl.bind(mainMod .. " + T", hl.dsp.exec_cmd(variables.alt_fileManager))
 hl.bind(mainMod .. " + Z", hl.dsp.exec_cmd(variables.editor))
 hl.bind(mainMod .. " + C", hl.dsp.exec_cmd(variables.alt_editor))
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(variables.browser))
-hl.bind(mainMod .. " + SPACE", hl.dsp.exec_cmd("pkill rofi || " .. variables.menu))
+hl.bind(mainMod .. " + SPACE", hl.dsp.exec_cmd(variables.launcher))
+hl.bind(mainMod .. " + G", hl.dsp.exec_cmd("pkill rofi || " .. variables.alt_launcher))
 
 
 ------------------------------------
@@ -33,7 +34,7 @@ hl.bind(mainMod .. " + N", hl.dsp.global("qs-bar:notification"))
 hl.bind(mainMod .. " + X", hl.dsp.global("qs-bar:powermenu"))
 hl.bind("SUPER + L", hl.dsp.global("qs:lock"))
 hl.bind("SUPER + W", hl.dsp.global("qs:wallpaper-switcher"))
-hl.bind("SUPER + V", hl.dsp.global("qs:clipboard"))
+-- hl.bind("SUPER + V", hl.dsp.global("qs:clipboard"))
 
 
 ------------------------------------

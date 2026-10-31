@@ -10,8 +10,9 @@ local V = {
     alt_fileManager = "nautilus",
     browser     = "zen-browser",
     editor      = "zeditor",
-    alt_editor  = "alacritty -e nvim",
-    menu        = "~/.config/rofi/launch_rofi.sh",
+    alt_editor  = "alacritty -e sh -c 'cd ~/Dev && nvim'",
+    launcher    = "vicinae toggle",
+    alt_launcher    = "~/.config/rofi/launch_rofi.sh",
     ss_region   = "hyprshot -m region --raw | satty --filename -",
     ss_screen   = "hyprshot -m output --raw | satty --filename -",
 }

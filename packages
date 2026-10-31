@@ -6,7 +6,7 @@ jdk21-openjdk(specifically jdk 21 for gradle to work) gradle wget(for mason kotl
 cage(wm for greetd)
 
 
-yay: zen-browser-bin heroic-games-launcer-bin android-studio
+yay: zen-browser-bin heroic-games-launcer-bin android-studio vicinae(launcher)
 
 for sddm:
 - create main file /etc/sddm.conf
