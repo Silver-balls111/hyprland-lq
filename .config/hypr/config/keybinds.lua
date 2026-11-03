@@ -17,7 +17,6 @@ hl.bind(mainMod .. " + Z", hl.dsp.exec_cmd(variables.editor))
 hl.bind(mainMod .. " + C", hl.dsp.exec_cmd(variables.alt_editor))
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(variables.browser))
 hl.bind(mainMod .. " + SPACE", hl.dsp.exec_cmd(variables.launcher))
-hl.bind(mainMod .. " + G", hl.dsp.exec_cmd("pkill rofi || " .. variables.alt_launcher))
 
 
 ------------------------------------

@@ -11,14 +11,10 @@ sudo pacman -Syu --needed iwd wpa_supplicant wireless_tools dialog dhcpcd \
 hyprland hypridle hyprshot hyprsunset hyprshutdown quickshell \
 playerctl brightnessctl \
 imagemagick bluez networkmanager upower pipewire wireplumber blueman \
-matugen awww rofi
+matugen awww
 
 printf "AUR Packages install...\n"
 yay -Syu --needed blesh-git ttf-jetbrains-mono-nerd ttf-rubik-vf sddm-silent-theme vicinae-bin
-
-cd ~/.config/rofi/
-chmod +x launch_rofi.sh generate_blur.sh
-cd ~
 
 printf "\n\n-Put wallpapers in ~/Pictures/wallpapers\n\n"
 printf "To make suspend work edit file:

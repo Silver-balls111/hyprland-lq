@@ -15,10 +15,6 @@ post_hook = 'hyprctl reload'
 input_path = '~/.config/matugen/templates/quickshell.json'
 output_path = '~/.local/state/quickshell/generated/colors.json'
 
-[templates.rofi ]
-input_path = '~/.config/matugen/templates/rofi-colors.rasi'
-output_path = '~/.config/rofi/colors.rasi'
-
 [templates.kitty]
 input_path = '~/.config/matugen/templates/kitty-colors.conf'
 output_path = '~/.config/kitty/themes/Matugen.conf'
