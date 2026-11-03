@@ -3,6 +3,7 @@
 ---------------
 hl.config({
     input = {
+        resolve_binds_by_sym = true,
         kb_layout          = "us",
         kb_variant         = "",
         kb_model           = "",

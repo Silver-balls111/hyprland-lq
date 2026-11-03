@@ -1,4 +1,4 @@
-!# /bin/bash
+#! /bin/bash
 
 printf "Git Clone...\n"
 git clone https://Silver-balls111/hyprland-lq.git && cd hyprland-lq

@@ -26,6 +26,7 @@ end)
 ---- USER APPLICATIONS -----
 ----------------------------
 hl.on("hyprland.start", function()
+    hl.exec_cmd("vicinae server")
     -- hl.exec_cmd("steam & discord")
 end)
 

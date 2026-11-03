@@ -32,7 +32,7 @@ shape = "Block"
 bindings = [
     { key = "v", mods = "Control", action = "Paste" },
     { key = "c", mods = "Control", action = "Copy" },
-    { key = "C", mods = "Control|Shift", chars = "\x03"}
+    { key = "C", mods = "Control|Shift", chars = "\x03"},
 ]
 
 [env]
