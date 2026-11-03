@@ -111,13 +111,6 @@ hl.layer_rule({
     animation = "slide right",
 })
 
-hl.layer_rule({
-    name = "qs:clipboard-dim",
-    match = { namespace = "quickshell:clipboard" },
-    dim_around = true,
-    animation = "popin 80%"
-})
-
 hl.window_rule({
     name    = "opaque-nautilus",
     match   = { class = [[^org\.gnome\.Nautilus$]] },

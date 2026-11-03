@@ -39,7 +39,6 @@ relative imports (`import "../core"`).
 | `bar/StatusPill.qml` | Right pill: SystemTray items, volume (scroll ±1% / click mute), mic, wifi, bluetooth, battery, power. Exposes `wifiRightX`/`btRightX`/`powerRightX` so Bar can anchor popups under the right icons — **do not delete these**, the popups depend on them. |
 | `core/Popups.qml` (singleton) | `active` = name of the open popup ("" / "clock" / "wifi" / "bt" / "power" / "tray" / "wall"). Single source of truth for popup exclusivity. `lastDismiss` guards against the outside-click that dismissed a popup re-triggering a toggle. |
 | `popups/RicePopup.qml` | Base class for dash/wifi/bt/power popups: full-screen transparent layer-shell "shield", visible rounded panel anchored inside it, closes on outside click / `Esc` / `Popups.active` change. `panelWidth` + optional `panelHeight` (0 = auto-size from content); panel x is clamped to the screen. |
-| `popups/ClipboardPopup.qml` | Clipboard history panel (cliphist backend, rofi picker replacement): search + category chips, preview cards, decode-on-demand thumbnails, pin sidecar. See its section below. |
 | `standalone/Lockscreen.qml` | Session lock (hyprlock replacement): blurred awww wallpaper, 12h clock + date, PAM password dots, battery + weather + status (right column), MPRIS media card, keyboard-layout switcher. Lives in the main shell instance; engages via `LockState` / `qs:lock` shortcut. See its section below. |
 | `core/LockState.qml` (singleton) | `engaged` bool bridging lock triggers (PowerPopup's Lock action, future callers) to `Lockscreen.engage()`. Never set `engaged = false` to bypass auth — that's what TTY `loginctl unlock-session` is for. |
 | `popups/WifiPopup.qml` | Wi-Fi toggle, networks sorted by signal (connected first), max 5 visible + scroll, inline password prompt (`connectWithPsk`). |
@@ -92,8 +91,8 @@ requests, and `WifiSecurityType.toString(i)`-style calls reveal enum names.
   ListView** (`width: <list>.width - 14`) so the attached ScrollBar lives in
   its own lane and never overlays right-edge content (Wi-Fi lock/check
   icons, power-menu keybind hints, tray-menu submenu arrows, notification
-  hover-✕, clipboard buttons). Applies to WifiPopup, BluetoothPopup,
-  PowerPopup, TrayMenuPopup, NotifsPanel and ClipboardPopup — ANY new
+  hover-✕). Applies to WifiPopup, BluetoothPopup,
+  PowerPopup, TrayMenuPopup and NotifsPanel — ANY new
   scrolling list does the same from day one (ListView/Flickable have no
   padding properties to lean on).
 - Anchoring data (`wifiRightX` etc. on StatusPill, `anchorX` on Bar) is easy to
@@ -367,102 +366,6 @@ Also: notification wrappers can die out-of-band even when `tracked` was set
 (server-side lifecycle) — guard every `notif.expire()/dismiss()` call with
 try/catch or the toast ticker throws "Type error is not a function".
 
-### Clipboard panel (ClipboardPopup.qml, 2026-10-05)
-
-Rofi clipboard picker replacement on the existing `wl-paste --watch cliphist
-store` daemon — the daemon and cliphist db are never touched by the shell.
-
-- **Trigger**: `GlobalShortcut` appid `qs`, name `clipboard` →
-  `Popups.toggle("clip")` (own appid — like the wallpaper picker, it's a
-  standalone desktop tool, not a bar feature; the user's bind is
-  `hl.bind(mainMod .. " + V", hl.dsp.global("qs:clipboard"))`). The panel is
-  instantiated at shell root via a lazy Loader (created on open, destroyed
-  on close — same as all popups) and centers itself on the screen:
-  `anchorX: screen.width/2` + `centerOnAnchor` + `centerVertically` (a
-  RicePopup option added for it). Size knobs: `panelW` / `panelH` at the top
-  of ClipboardPopup.qml.
-- **Data**: one `cliphist list` per open. Lines are `id\tpreview`
-  (tab-separated); multi-line continuations don't match `^\d+\t` and are
-  skipped. Categories: image when the preview starts with `[[ binary data `
-  (header is `[[ binary data <size-with-unit> <ext> <W>x<H> ]]` — the size
-  token can contain a space, so the regex is lazy: `.*? (\w+) (\d+)x(\d+)`),
-  link on `^https?://`, else text. `<meta http-equiv=` previews are skipped
-  (HTML title junk, same as the user's rofi script). Everything after this
-  is in-memory JS filtering — no watchers, no per-keystroke processes.
-- **Decode on demand ONLY**: restore (`printf "%s\n" "$raw" | cliphist
-  decode | wl-copy` — pipe is binary-safe), delete (same stdin shape), and
-  image thumbnails (first visible render decodes to
-  `~/.cache/quickshell_rice/clipboard-<id>.<ext>`, persistent → later opens
-  free; a `thumbs` id-array reassignment drives the Image source bindings —
-  mutating an array in place would NOT). Expanded text decodes capped at
-  64KB (`head -c`). Search matches previews only (~100 chars) — full-content
-  search would decode 200 entries per keystroke.
-- **Pins**: sidecar `~/.cache/quickshell_rice/clipboard-pins`, one id per
-  line, written via a Process. Read it with a Process too (`cat`, missing
-  file = empty output) — the FileView failed-load callback timing once
-  silently reverted a pin race-style; the Process read is deterministic.
-  Pinned ids sort first via a stable sort. Pruned ids vanish silently. The
-  panel order otherwise IS `cliphist list`'s own order (newest copy first —
-  verified: restoring an old entry re-stores it as a NEW id at the top of
-  the list; a 2s poll surfaces it; a pinned card legitimately sits above).
-  Restoring also leaves the old entry behind as a duplicate in cliphist —
-  same artifact the rofi flow had, not worth solving.
-- **Qt's V4 `Array.sort` is NOT stable** (cost the user a "recency broken"
-  round): the pinned-first `sort()` with an all-zero comparator (no pins)
-  silently permuted cliphist's newest-first order into an arbitrary one.
-  Ordering that must preserve an underlying sequence is built with
-  `filter` + `concat` partitioning (stable by construction), never `sort()`
-  — `ordered` is the identity when no pins exist. Verified by dumping panel
-  ids vs `cliphist list` ids side by side.
-- **Per-popup layer namespaces**: RicePopup's namespace is a property
-  (`layerNamespace`, default `quickshell:popup`); ClipboardPopup overrides
-  it to `quickshell:clipboard` — that's the string to match in Hyprland
-  layerrules (e.g. `dimaround`). Search row + card insets use `Theme.track`
-  (fg-derived) — `inputBg` is plain white and washes out on light palettes.
-  Expand state (`expandedText`/`bigImages`) resets on every open; pins
-  deliberately do not (they reload from the sidecar).
-- **Buttons are mouse-only by design**: ⤢/☆/✕ are plain MouseAreas — never
-  focused, not in the tab order, no keybinds. Keyboard exists solely to
-  iterate cards (fast list walking): Tab/Backtab/Up/Down move, Enter
-  restores the selected card. The ✕ is hover-only and its hovered state
-  must NOT live in the button Repeater's model array (it would rebuild the
-  buttons every time the mouse crosses a row) — the delegate reads the row
-  hover itself. Link cards have no ⤢ (nothing to expand).
-- **Space types a space in the search field** (deviation from the original
-  plan's "Space restores" — a visible search field must accept spaces);
-  Enter restores. `searchText` is an ALIAS of the TextField's text — the
-  filter binding reads it, so typing filters with zero glue code; the
-  open-reset clears the FIELD (a separate `searchText` state var once
-  diverged from the field: filter ran while the field looked empty).
-- **TextField key handling**: arrows/Tab must be intercepted via
-  `Keys.onPressed` (there is no `Keys.onTabPressed` attached handler);
-  Left/Right/Home/End stay unintercepted for cursor movement. First Esc
-  clears the search, second closes — and the FIELD closes explicitly
-  (relying on the event bubbling from the field to the body's
-  `Keys.onEscapePressed` did not work in practice).
-- **Fixes from the first user round — recurring QML traps, do not rediscover**:
-  - Click priority: the row MouseArea must be declared FIRST in the delegate
-    (lowest z) — declared last it sat ON TOP of the button column and
-    swallowed every button click as "restore". Card hover then comes from a
-    passive `HoverHandler`, NOT the MouseArea: a covered MouseArea loses
-    hover, so the hover-only ✕ would vanish the moment the mouse reached it.
-  - `Column`/`Row` layout SKIPS invisible children — a hover-only ✕ toggled
-    with `visible:` resizes every card on hover. Reserve the slot with
-    `opacity` + `enabled` instead.
-  - ListView is a Flickable: it has NO padding properties (`rightPadding` →
-    "Cannot assign to non-existent property"). Clear the attached scrollbar
-    with an explicit delegate width.
-  - Links: `Theme.accent` is unreadable on light palettes (near-white on
-    white insets). Adaptive via a small `lum()` helper in ClipboardPopup:
-    accent only when |lum(accent) − lum(popupBg)| > 0.35, else fg + underline.
-  - Expand-button rule: cliphist marks truncated previews with a trailing
-    `…` — short items get NO expand button; an expanded item shows the
-    shrink glyph (f066) instead of expand (f065). Images always have it.
-  - Live refresh: a 2s Timer re-runs `cliphist list` while the panel is open
-    (parse ~1ms) so new copies appear without reopening; `parseList` must
-    NOT reset `selIndex` (the poll would yank the selection to the top —
-    only the open path resets it).
-
 ### System usage section (SystemUsage.qml + ScreenTime.qml, 2026-10-05)
 
 Bottom of the dashboard's calendar column, below the calendar. Layout per
@@ -527,7 +430,7 @@ and the bar rows (`gap = (height − 66 − 3×28) / 3`, min 10).
   check in every read/write: dayKey ≠ today → reset). An awake stretch
   spanning midnight counts entirely into the new day (accepted). The sidecar
   read/write uses a Process (`cat` / `printf > file`) — same reasoning as the
-  clipboard pins (missing-file is normal first-run state; FileView callback
+  pin sidecars (missing-file is normal first-run state; FileView callback
   timing burned us before).
 - **Singleton laziness gotcha**: a pragma-Singleton component does NOTHING
   until first accessed. ScreenTime must accumulate all day even if the
@@ -908,8 +811,9 @@ Full numbers in [OPTIMIZATIONS.md](OPTIMIZATIONS.md); the load-bearing bits:
   GPU textures do not appear in RSS — private-dirty anon is JS + QML trees +
   the CPU-side pixmap cache.
 - **Popups are lazy now** (`Loader { active: Popups.active === "<name>" }` in
-  Bar.qml ×4, StatusPill's TrayMenuPopup, shell.qml Wallswitch +
-  ClipboardPopup): created when the popup opens, DESTROYED when it closes.
+  Bar.qml ×4, StatusPill's TrayMenuPopup, shell.qml Wallswitch — the
+  clipboard panel that also lived here has since been removed entirely):
+  created when the popup opens, DESTROYED when it closes.
   RicePopup / TrayMenuPopup / Wallswitch all sync initial visibility from
   `Popups.active` in `Component.onCompleted`, so being created mid-open
   works. Two designs were tried and REJECTED — do not retry: (1) a latch
@@ -924,15 +828,11 @@ Full numbers in [OPTIMIZATIONS.md](OPTIMIZATIONS.md); the load-bearing bits:
   synchronously destroys the popup's whole object tree the moment
   `Popups.active` clears — `apply()`/`restore()` started their command and
   closed the popup in the same tick, killing awww/wl-copy before it ran
-  (both pickers "closed without applying" — the memory pass regression).
+  (the picker "closed without applying" — the memory pass regression).
   Rule: **fire-and-forget actions never live inside lazy popups** — they
   live in `core/Actions.qml` (persistent singleton, Item root per the
-  ScreenTime precedent): `Actions.applyWallpaper(path, trans)`,
-  `Actions.restoreClipboard(raw)`, `Actions.deleteClipboard(raw)`. Processes
-  whose results are only consumed while the popup is open (list, expand,
-  thumbs, pins) stay in the popup — but the clipboard thumbnail decode now
-  writes to `<cache>.part` + `mv` (atomic), so a close-mid-decode can no
-  longer leave a corrupt cache file behind.
+  ScreenTime precedent): `Actions.applyWallpaper(path, trans)`. Processes
+  whose results are only consumed while the popup is open stay in the popup.
 - **glibc tuning on the launch line** (autostart.lua):
   `MALLOC_ARENA_MAX=2 MALLOC_TRIM_THRESHOLD_=8388608` — measured −32 MB and
   caps the RSS ratchet. Remove and RSS drifts back up.

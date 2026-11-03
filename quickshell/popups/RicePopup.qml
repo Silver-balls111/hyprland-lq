@@ -19,9 +19,6 @@ PanelWindow {
     property int panelWidth: 300
     // fixed panel height; 0 = auto-size from content (childrenRect)
     property int panelHeight: 0
-    // true: panel vertically centered on the screen instead of hanging under
-    // the bar (standalone fullscreen panels like the clipboard picker)
-    property bool centerVertically: false
     // keyboard navigation (Tab/arrows/Enter): popups that opt in grab the
     // keyboard while open so keys reach the panel without a click first
     property bool keyNavEnabled: false
@@ -93,9 +90,7 @@ PanelWindow {
             if (sw <= 0) return raw;
             return Math.max(8, Math.min(raw, sw - width - 8));
         }
-        y: root.centerVertically
-            ? Math.max(8, Math.round(((root.screen ? root.screen.height : 1080) - height) / 2))
-            : Theme.barHeight
+        y: Theme.barHeight
         width: root.panelWidth
         height: body.height
 

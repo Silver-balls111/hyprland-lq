@@ -35,11 +35,8 @@ end)
 -------------------
 hl.on("hyprland.start", function ()
     hl.exec_cmd("systemctl --user start hyprpolkitagent")
-    hl.exec_cmd("wl-paste --type text --watch cliphist store")  -- Stores only text data
-    hl.exec_cmd("wl-paste --type image --watch cliphist store")  -- Stores only image data
     hl.exec_cmd("xdg-desktop-portal-hyprland")
     hl.exec_cmd("dbus-update-activation-enviroment --systemd --all")    -- to get share picker use system theme
     hl.exec_cmd("systemctl --user import-environment QT_QPA_PLATFORMTHEME") -- to get share picker use system theme
-    --  hl.exec_cmd("wl-paste -p --watch wl-copy -pc")  -- Disables Middle click functionality for accidental pasting.
     --hl.exec_cmd("xwaylandvideobridge")          -- it is like a compatibility tool for screensharing/running X11/xorg windows on Wayland
 end)

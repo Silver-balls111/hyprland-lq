@@ -46,7 +46,8 @@ config; this pass removed ~58 MB of it and capped the growth ratchet.
 
 1. **Popups are created on demand and destroyed on close**
    (`bar/Bar.qml` ×4, `bar/StatusPill.qml` tray menu, `shell.qml`
-   Wallswitch + ClipboardPopup — plain `Loader { active: Popups.active ===
+   Wallswitch (ClipboardPopup has since been removed entirely) — plain
+   `Loader { active: Popups.active ===
    "name" }`). An idle shell now carries zero popup trees, and close returns
    that memory. Two designs were tried first and REJECTED — don't retry:
    - *Latch Loader* (`active: everOpened || Popups.active === name` +

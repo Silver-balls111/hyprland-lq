@@ -10,9 +10,9 @@ import Quickshell.Io
 // arguments and call these functions right before Popups.close(); the
 // Process keeps running.
 //
-// NB: never move these back into Wallswitch/ClipboardPopup — the memory pass
-// (c5dfbe8) silently broke apply/restore exactly that way (popup closes ->
-// Loader destroys the tree -> the freshly started Process dies with it).
+// NB: never move these back into Wallswitch — the memory pass
+// (c5dfbe8) silently broke apply exactly that way (popup closes -> Loader
+// destroys the tree -> the freshly started Process dies with it).
 Item {
     id: root
 
@@ -49,38 +49,6 @@ Item {
         applyProc.path = path;
         applyProc.trans = trans || "fade";
         applyProc.running = true;
-    }
-
-    // ---- clipboard restore: decode entry back onto the clipboard ----
-    Process {
-        id: restoreProc
-        command: []
-        stderr: StdioCollector {
-            onStreamFinished: if (text.trim()) console.warn("clip: restore stderr:", text.trim())
-        }
-    }
-
-    function restoreClipboard(raw) {
-        if (!raw) return;
-        restoreProc.command = ["sh", "-c",
-            'printf "%s\\n" "$1" | cliphist decode | wl-copy', "sh", raw];
-        restoreProc.running = true;
-    }
-
-    // ---- clipboard delete ----
-    Process {
-        id: deleteProc
-        command: []
-        stderr: StdioCollector {
-            onStreamFinished: if (text.trim()) console.warn("clip: delete stderr:", text.trim())
-        }
-    }
-
-    function deleteClipboard(raw) {
-        if (!raw) return;
-        deleteProc.command = ["sh", "-c",
-            'printf "%s\\n" "$1" | cliphist delete', "sh", raw];
-        deleteProc.running = true;
     }
 
     // ---- greetd wallpaper sync: re-point the greeter symlink before power actions ----

@@ -5,7 +5,7 @@
 
 A Quickshell desktop shell for **Arch Linux + Hyprland ≥ 0.56**, built for **Quickshell 0.3.1**.
 One process replaces waybar (the pill bar), swaync (notifications + dashboard), hyprlock
-(lock screen), wlogout (power menu) and three rofi pickers (wallpaper, clipboard, tray menus).
+(lock screen), wlogout (power menu) and the rofi pickers (wallpaper, tray menus).
 Colors are not hardcoded — matugen recolors everything live from the wallpaper
 (pink is the fallback palette).
 
@@ -23,6 +23,7 @@ Colors are not hardcoded — matugen recolors everything live from the wallpaper
 | `ttf-rubik-vf` | All text (variable weight) |
 | `matugen` + `awww` | Palette generation from the wallpaper |
 | `networkmanager` | Wi-Fi module |
+| `vicinae` | Clipboard history (`SUPER+V`) — not part of this shell |
 | `upower` | Battery module |
 | `pipewire` + `wireplumber` | Volume/mic modules |
 | `bluez` | Bluetooth module |
@@ -56,7 +57,6 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
    hl.bind(mainMod .. " + X", hl.dsp.global("qs-bar:powermenu"))          -- power popup
    hl.bind(mainMod .. " + N", hl.dsp.global("qs-bar:notification"))       -- dashboard
    hl.bind(mainMod .. " + W", hl.dsp.global("qs:wallpaper-switcher"))     -- wallpaper picker
-   hl.bind(mainMod .. " + V", hl.dsp.global("qs:clipboard"))              -- clipboard panel
    hl.bind("SUPER + L", hl.dsp.global("qs:lock"))                     -- lock screen
    ```
    The OSD watches real device state, so volume/brightness keys need no helper
@@ -151,7 +151,6 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
 | Power | Click opens **Lock / Log Out / Reboot / Power Off**. Keyboard: `Tab`/arrows or the wlogout letters (`s`/`r`/`u`/`l`/`h`/`o`), `Enter` runs the action, `Esc` closes. |
 | Lock screen | The `SUPER+L` bind, hypridle, or the power menu locks the session behind a blurred current wallpaper: big 12h clock + date, invisible password field with small breathing dots (typed chars only — `Esc`/`Ctrl+U`/`Ctrl+Backspace` clear, `Enter` submits to PAM), an animated gradient border on verify/fail with a small "Authentication failed" message, a "Caps Lock active" warning, battery, weather and a vol/mic/bt status line (right column), a clickable keyboard-layout switcher, and an MPRIS media card while something plays. Everything is plain text over the blur — no cards, no shadows. Unlocks only on a correct password; no fingerprint (Quickshell PAM is password-only). |
 | Wallpaper picker | `SUPER+W` opens a **skwd-wall-style picker** floating over the live desktop: four right-leaning slanted slices per side of a fixed 16:9 center frame, the selected wallpaper enlarged behind an accent border (starts on the current wallpaper; only the focused one shows its filename chip). Scroll / arrow keys / click a slice to preview it centered; click the centered one or press `Enter`/`Space` to apply — `awww` with a random transition, then `matugen` regenerates the whole palette live (requires `[config.wallpaper] set = false` in matugen's config so it never re-applies the image itself). **Type to search**: printable keys filter the set live with a `query · matches` chip above the row, `Backspace` edits, `Esc` clears the search first. `Esc` (with empty search) or clicking bare desktop closes. An optional `dimaround` layer rule (see setup step 4) dims the desktop behind it. Replaces the old rofi `wall-switcher.sh` flow. |
-| Clipboard history | `SUPER+V` opens a **cliphist-backed panel** (replaces the rofi clipboard picker; your `wl-paste --watch cliphist store` daemon stays as-is): a search field, All/Text/Image/Link chips with live counts, and compact preview cards. Click a card (or `Enter` on the selected one) to paste it back; cards show 3 lines of text, tinted links, or image thumbnails (decoded once, cached under `~/.cache/quickshell_rice/`). Per-card buttons: expand text to full content / images to true aspect, pin (pinned cards sort first, `☆`→`★`), hover-`✕` deletes from cliphist. Keyboard-first: arrows/`Tab` iterate cards, typing searches, `Esc` clears the search first. |
 
 All icons are **Nerd Font glyphs** (JetBrains Mono Nerd Font Propo) using the
 same codepoints as `~/.config/waybar/config.jsonc` — battery levels, volume,
@@ -170,7 +169,7 @@ core/            singletons: Theme, Icons, Popups, Notifs, LockState, ScreenTime
 ui/              primitives: NIcon, Pill, Toggle, SignalBars, RoundedImage, TooltipWindow
 bar/             the bar + its feedback surfaces: Bar, Workspaces, ClockPill, StatusPill, Osd, Toast
 popups/          RicePopup panels: DashPopup (+ CalendarPanel, NotifsPanel, SystemUsage),
-                 WifiPopup, BluetoothPopup, PowerPopup, TrayMenuPopup, ClipboardPopup
+                 WifiPopup, BluetoothPopup, PowerPopup, TrayMenuPopup
 standalone/      fullscreen session-level surfaces: Wallswitch, Lockscreen
 assets/          pfp.png avatar (untracked — drop your own image here)
 shaders/         parked Wallswitch shader experiment (not used by live code)

@@ -45,17 +45,6 @@ ShellRoot {
         onPressed: Popups.toggle("wall")
     }
 
-    // mainMod+V — clipboard history panel (cliphist backend, rofi picker
-    // replacement). Standalone fullscreen panel (not a bar feature — its own
-    // appid), centered on screen by the instance itself. Bind line:
-    // hl.bind("SUPER + V", hl.dsp.global("qs:clipboard"))
-    GlobalShortcut {
-        appid: "qs"
-        name: "clipboard"
-        description: "Toggle the clipboard history panel"
-        onPressed: Popups.toggle("clip")
-    }
-
     // The notification daemon — replaces swaync. Instantiated once here at the
     // shell root (NOT per-screen): only one process can own
     // org.freedesktop.Notifications, and swaync must not be running.
@@ -99,13 +88,6 @@ ShellRoot {
     Loader {
         active: Popups.active === "wall"
         sourceComponent: Wallswitch {}
-    }
-
-    // clipboard history panel (standalone, screen-centered, not a bar
-    // feature) — created on demand, destroyed on close
-    Loader {
-        active: Popups.active === "clip"
-        sourceComponent: ClipboardPopup {}
     }
 
     // session lock screen (hyprlock replacement). Inert until something sets

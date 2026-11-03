@@ -65,7 +65,7 @@ Item {
 
     // sidecar I/O via Process, not FileView: a missing file is the normal
     // first-run state and FileView's failed-load callback timing is exactly
-    // the kind of ambiguity that once reverted a clipboard pin race-style
+    // the kind of ambiguity that once reverted a pin sidecar race-style
     Process {
         id: reader
         command: ["sh", "-c",

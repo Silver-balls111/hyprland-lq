@@ -12,7 +12,7 @@ A Quickshell **0.3.1** desktop shell for **Arch Linux + Hyprland ≥ 0.56**,
 run as the named config **`rice`** (`qs -c rice`; `~/.config/quickshell/rice`
 is a symlink to this repo). One QML codebase replaces waybar (bar), swaync
 (notifications + dashboard), hyprlock (lock screen), wlogout (power menu) and
-three rofi pickers (wallpaper, clipboard, tray menus). Colors are never
+two rofi pickers (wallpaper, tray menus). Colors are never
 hardcoded — matugen regenerates the palette from the wallpaper and the shell
 recolors live.
 
@@ -30,7 +30,6 @@ shell speaks the new syntax and falls back on older Hyprland (detected via
 | `ttf-rubik-vf` | All text |
 | `matugen` + `awww` | Palette generation / wallpaper transitions |
 | `networkmanager`, `upower`, `pipewire` + `wireplumber`, `bluez` | Wi-Fi, battery, volume/mic, bluetooth modules |
-| `cliphist` + `wl-clipboard` | Clipboard history backend |
 
 ## Run & dev loop
 
@@ -54,13 +53,13 @@ Everything else is grouped by role; each directory carries its own `qmldir`.
 
 ```
 shell.qml            Entry: GlobalShortcuts, NotificationServer, palette FileView,
-                     Toast/Osd, per-screen Bar (Variants), Wallswitch, Clipboard, Lockscreen
+                     Toast/Osd, per-screen Bar (Variants), Wallswitch, Lockscreen
 core/Colors.qml      palette singleton — FileView-watches matugen's colors.json (regenerated, do not hand-edit)
 core/                Singletons: Theme, Icons, Popups, Notifs, LockState, ScreenTime
 ui/                  Reusable primitives: NIcon, Pill, Toggle, SignalBars, RoundedImage, TooltipWindow
 bar/                 The bar and its feedback surfaces: Bar, Workspaces, ClockPill, StatusPill, Osd, Toast
 popups/              RicePopup-based anchored panels: DashPopup (+ CalendarPanel, NotifsPanel,
-                     SystemUsage), WifiPopup, BluetoothPopup, PowerPopup, TrayMenuPopup, ClipboardPopup
+                     SystemUsage), WifiPopup, BluetoothPopup, PowerPopup, TrayMenuPopup
 standalone/          Fullscreen session-level surfaces: Wallswitch, Lockscreen
 assets/              pfp.png avatar (untracked — drop your own image there)
 shaders/             Parked Wallswitch AA-shader experiment (NOT used by live code; kept for a future retry)
@@ -80,12 +79,12 @@ QML import rules in force:
 
 ### Boot chain (shell.qml)
 
-`Component.onCompleted: ScreenTime.init()` → the four `GlobalShortcut`s
-(`qs-bar:powermenu`, `qs-bar:notification`, `qs:wallpaper-switcher`,
-`qs:clipboard`) → the `NotificationServer` (this shell **is** the notification
+`Component.onCompleted: ScreenTime.init()` → the three `GlobalShortcut`s
+(`qs-bar:powermenu`, `qs-bar:notification`, `qs:wallpaper-switcher`) → the
+`NotificationServer` (this shell **is** the notification
 daemon; exactly one instance, at shell root, never per-screen) → the palette
 `FileView` → `Toast`, `Osd` → `Variants { model: Quickshell.screens }` spawning
-one `Bar` per screen → `Wallswitch`, `ClipboardPopup`, `Lockscreen` (declared
+one `Bar` per screen → `Wallswitch`, `Lockscreen` (declared
 after `Variants` so their invisible input shields stack above the bar).
 
 ### Theming
@@ -119,7 +118,7 @@ the shield and closes the popup. Invariants:
   ScrollBar never overlays content.
 - Each layer window sets a `WlrLayershell.namespace` (`quickshell:bar`,
   `quickshell:popup`, `quickshell:toast`, `quickshell:tooltip`,
-  `quickshell:wallswitch`, `quickshell:clipboard`, `quickshell:lockscreen-test`
+  `quickshell:wallswitch`, `quickshell:lockscreen-test`
   in the lock test branch) — Hyprland layerrules (blur, dimaround) match on
   these strings.
 - `RicePopup` subclasses override `onVisibleChanged` via
@@ -219,7 +218,7 @@ bindings at the top of `core/Theme.qml`.
 ## Hyprland integration
 
 - Global shortcuts: appid `qs-bar` (powermenu, notification, lock) and `qs`
-  (wallpaper-switcher, clipboard). Bound in the user's Lua config, e.g.
+  (wallpaper-switcher). Bound in the user's Lua config, e.g.
   `hl.bind(mainMod .. " + X", hl.dsp.global("qs-bar:powermenu"))`.
   `IpcHandler` does not exist in 0.3.1 — GlobalShortcut is the only entry
   point.
