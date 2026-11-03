@@ -181,7 +181,7 @@ own body `Keys` itself. The dashboard intentionally has no keyboard nav.
 2. Cross-references between directories always use explicit relative imports.
 3. All non-icon text uses `Theme.textSize`; all icons go through `NIcon` +
    `Icons`. New glyphs must be render-tested (a codepoint in the cmap can
-   still render as tofu — see AGENTS.md "Font coverage lies").
+   still render as tofu — see docs/agents/palette-icons-fonts.md "Font coverage lies").
 4. Any new scrollable list reserves the 14 px scrollbar lane.
 5. Any new pill exposes anchor properties (`rowX`/`*RightX`) if popups will
    anchor to it — a NaN anchor makes a popup open invisibly.
@@ -245,8 +245,8 @@ bindings at the top of `core/Theme.qml`.
   `file:` URLs — bare absolute paths are rejected:
 
   ```qml
-  import "file:/home/anuj/Documents/Dev/quickshell_rice/core"
-  import "file:/home/anuj/Documents/Dev/quickshell_rice/popups"
+  import "file:/home/bandit/Dev/hyprland-lq/quickshell/core"
+  import "file:/home/bandit/Dev/hyprland-lq/quickshell/popups"
 
   ShellRoot {
       DashPopup {}

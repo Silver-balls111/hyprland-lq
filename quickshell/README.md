@@ -34,12 +34,12 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
 
 1. **Get the shell running**
    ```sh
-   qs -p ~/Documents/Dev/quickshell_rice/shell.qml
+   qs -p ~/Dev/hyprland-lq/quickshell/shell.qml
    ```
    or register it as a named config once, then use `qs -c rice`:
    ```sh
    mkdir -p ~/.config/quickshell
-   ln -s ~/Documents/Dev/quickshell_rice ~/.config/quickshell/rice
+   ln -s ~/Dev/hyprland-lq/quickshell ~/.config/quickshell/rice
    qs -c rice
    ```
    Quickshell hot-reloads on every file save — tweaking QML needs no restart.
@@ -130,7 +130,7 @@ An MPRIS-capable player (Firefox, mpv, …) makes the dashboard's media card app
    If the password is ever rejected with PAM broken: switch to a TTY
    (Ctrl+Alt+F2) and run `loginctl unlock-session`. To preview without
    locking, run a throwaway instance that sets `testMode: true` (see
-   AGENTS.md "Lock screen"); the widgets you don't want are self-contained
+   docs/agents/lockscreen.md); the widgets you don't want are self-contained
    blocks at the bottom of `standalone/Lockscreen.qml` — comment them out like you did
    in hyprlock.conf.
 
