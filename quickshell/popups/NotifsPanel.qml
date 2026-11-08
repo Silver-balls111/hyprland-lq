@@ -30,16 +30,43 @@ Item {
             if (historyModel.get(r).entryId === id) return r;
         return -1;
     }
+    // ── Clear-all: staggered in-place swipe-out ──
+    // Clear NEVER removes a visible row: removing them one by one reflows the
+    // rows below, which hopped up a slot ("staggered") while the row above was
+    // still swiping right. Instead every row swipes out IN PLACE — staggered
+    // top-down from the delegate via its `leaving` role — and the model is
+    // dropped in ONE pass after the last swipe finished, so nothing ever
+    // reflows while anything is visible. (A normal ✕ keeps hop-up: its
+    // survivors SHOULD move up.)
+    property bool clearing: false
+    readonly property int staggerMs: 150
+    function beginClear() {
+        clearing = true;
+        // one swipe = 240ms slide + 180ms fade; the last row's pause is
+        // stagger * (count - 1) — finish just after it, with slack
+        clearFinish.interval = staggerMs * Math.max(0, historyModel.count - 1) + 450;
+        clearFinish.restart();
+        for (let i = 0; i < historyModel.count; i++)
+            historyModel.setProperty(i, "leaving", true);
+    }
+
     function syncHistory() {
         const want = Notifs.history;
-        // empty history = Clear or the last row ✕-removed: cascade the rows
-        // out one by one (each gets its own swipe) instead of a bare reset
-        // that would skip the animations
+        // empty history = Clear, or a ✕ on the only row: every current row
+        // gets its own in-place swipe instead of a bare model reset that
+        // would skip the animations
         if (want.length === 0) {
-            if (historyModel.count > 0) cascadeTimer.restart();
+            if (historyModel.count > 0) beginClear();
             return;
         }
-        if (cascadeTimer.running) cascadeTimer.stop();
+        // a non-empty sync while the swipe-out is running (a toast arrived
+        // mid-clear) aborts it: restore the rows, finisher becomes a no-op
+        if (clearing) {
+            clearing = false;
+            clearFinish.stop();
+            for (let r = 0; r < historyModel.count; r++)
+                historyModel.setProperty(r, "leaving", false);
+        }
         for (let r = historyModel.count - 1; r >= 0; r--) {
             const rid = historyModel.get(r).entryId;
             if (want.findIndex(e => e.id === rid) === -1)
@@ -57,7 +84,8 @@ Item {
                     summary: want[j].summary,
                     body: want[j].body,
                     urgency: want[j].urgency,
-                    expanded: false
+                    expanded: false,
+                    leaving: false
                 });
             return;
         }
@@ -69,21 +97,19 @@ Item {
                     summary: want[i].summary,
                     body: want[i].body,
                     urgency: want[i].urgency,
-                    expanded: false
+                    expanded: false,
+                    leaving: false
                 });
         }
     }
-    // staggered removal for Clear / last-row removal
+    // once the last swipe-out has finished, drop the whole model in one pass —
+    // every row is already at opacity 0, so this triggers no visible animations
     Timer {
-        id: cascadeTimer
-        interval: 150
-        repeat: true
+        id: clearFinish
         onTriggered: {
-            if (Notifs.history.length > 0 || historyModel.count === 0) {
-                cascadeTimer.stop();
-                return;
-            }
-            historyModel.remove(0);
+            if (!root.clearing) return;
+            root.clearing = false;
+            historyModel.clear();
         }
     }
     Connections {
@@ -226,7 +252,7 @@ Item {
             id: notifList
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: count > 0 || cascadeTimer.running
+            visible: count > 0 || root.clearing
             clip: true
             spacing: 2
             boundsBehavior: Flickable.StopAtBounds
@@ -268,6 +294,7 @@ Item {
                 required property string body
                 required property int urgency
                 required property bool expanded
+                required property bool leaving
 
                 width: notifList.width - 14
                 // expansion grows DOWNWARD only: content is top-anchored, so
@@ -282,7 +309,8 @@ Item {
                     NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
                 }
 
-                // swipe-out on ✕ removal (Clear cascades instead of resetting)
+                // swipe-out on ✕ removal (Clear instead runs the in-place
+                // `leaveAnim` via the `leaving` role)
                 // NB: the animation is a declared object driven from the signal
                 // handler — assigning the object DIRECTLY to onRemove is the
                 // deprecated "object to signal handler" pattern Qt warns about
@@ -293,7 +321,32 @@ Item {
                     NumberAnimation { target: notifRow; property: "opacity"; to: 0; duration: 180 }
                     PropertyAction { target: notifRow; property: "ListView.delayRemove"; value: false }
                 }
-                ListView.onRemove: removeAnim.start()
+                ListView.onRemove: {
+                    // the in-place `leaveAnim` owns the row during Clear; only
+                    // a model removal NOT driven by Clear (the ✕) animates here
+                    if (!notifRow.leaving) removeAnim.start()
+                }
+
+                // Clear's in-place swipe-out: the row stays in the model the
+                // whole time, so nothing below it is ever displaced (see the
+                // `clearing` notes). The pause is per-index, so the newest row
+                // (top) leaves first and the sweep rolls down the list.
+                SequentialAnimation {
+                    id: leaveAnim
+                    PauseAnimation { duration: notifRow.index * root.staggerMs }
+                    NumberAnimation { target: notifRow; property: "x"; to: notifRow.width + 40; duration: 240; easing.type: Easing.InQuad }
+                    NumberAnimation { target: notifRow; property: "opacity"; to: 0; duration: 180 }
+                }
+                onLeavingChanged: {
+                    if (leaving) {
+                        leaveAnim.start();
+                    } else {
+                        // mid-clear abort (a new toast arrived): restore the row
+                        leaveAnim.stop();
+                        notifRow.x = 0;
+                        notifRow.opacity = 1;
+                    }
+                }
 
                 Rectangle {
                     id: iconChip
@@ -388,7 +441,7 @@ Item {
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: notifList.count === 0 && !cascadeTimer.running
+            visible: notifList.count === 0 && !root.clearing
 
             Column {
                 anchors.centerIn: parent
