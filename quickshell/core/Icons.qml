@@ -8,7 +8,18 @@ QtObject {
     function glyph(name, level) {
         if (name === "battery") return batteryGlyph(level, false);
         if (name === "batteryCharging") return batteryGlyph(level, true);
+        if (name === "wifiStrength") return wifiGlyph(level);
         return glyphs[name] || "";
+    }
+
+    // signal strength 0..1 (-1 = not connected) → graded MDI wifi glyphs
+    // (render-tested: f091f/f0922/f0925/f0928 are strength 1..4; f092f outline)
+    function wifiGlyph(strength) {
+        if (strength < 0) return glyphs.wifiStrengthOutline;
+        if (strength >= 0.75) return glyphs.wifiStrength4;
+        if (strength >= 0.5) return glyphs.wifiStrength3;
+        if (strength >= 0.25) return glyphs.wifiStrength2;
+        return glyphs.wifiStrength1;
     }
 
     // per-glyph vertical correction (px) — nerd font ranges have differing
@@ -47,6 +58,12 @@ QtObject {
         "micOff": String.fromCodePoint(0xF036D),
         "wifi": String.fromCodePoint(0xF1EB),
         "wifiOff": String.fromCodePoint(0xF05AA),
+        // graded wifi glyphs (MDI wifi-strength 1..4 + outline)
+        "wifiStrength1": String.fromCodePoint(0xF091F),
+        "wifiStrength2": String.fromCodePoint(0xF0922),
+        "wifiStrength3": String.fromCodePoint(0xF0925),
+        "wifiStrength4": String.fromCodePoint(0xF0928),
+        "wifiStrengthOutline": String.fromCodePoint(0xF092F),
         "bluetooth": String.fromCodePoint(0xF294),
         "bluetoothOff": String.fromCodePoint(0xF00B2),
         "bell": String.fromCodePoint(0xF009C),

@@ -22,6 +22,10 @@ requests, and `WifiSecurityType.toString(i)`-style calls reveal enum names.
 - Module paths: Bluetooth is `Quickshell.Bluetooth` (not `Services.`); tray
   methods are `activate()`, `secondaryActivate()`, `scroll(delta, horizontal)`,
   `display(win, x, y)`; menus come from the `menu` handle.
+- `WifiNetwork.signalStrength` is a **0..1 fraction** (confirmed live:
+  0.37–0.84), not 0–100 — multiply by 100 for display. `SignalBars` and
+  `Icons.wifiGlyph()` both take the raw fraction. The connected network's
+  `signalStrengthChanged` notify keeps the bar icon live.
 - Enums read as `TypeName.Value` (`DeviceType.Wifi`, `ConnectionState.Connected`
   = 2, `UPowerDeviceState.Charging` = 1, `BluetoothDeviceState.Connected` = 1,
   `WifiSecurityType.Open` = 10). qmltypes files are incomplete/empty (Hyprland,

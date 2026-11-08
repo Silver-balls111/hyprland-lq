@@ -58,6 +58,12 @@ next f04e (▶▶), music f001, xmark f00d.
 against JetBrains Mono text — update it if you add glyphs. BT device rows all
 use the plain bluetooth glyph (matches waybar).
 
+Wifi strength uses the MDI graded set (render-tested, not just cmap-checked):
+`f091f`/`f0922`/`f0925`/`f0928` = strength 1–4, `f092f` = outline (radio on,
+not connected); `f05aa` stays the disabled/off glyph. `Icons.wifiGlyph(0..1)`
+is reached through `glyph("wifiStrength", level)`; the bar's `NIcon` passes
+`StatusPill.wifiSignal` (raw 0..1 fraction, -1 when disconnected).
+
 **Font coverage lies: a codepoint in the cmap can still render wrong.** `next`
 was initially f04d (fa-step-forward) — fc-query lists it as covered, but in
 JetBrains Mono Nerd Font Propo it renders as a **filled square** (codepoint

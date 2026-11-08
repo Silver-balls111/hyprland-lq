@@ -42,13 +42,16 @@ Pill {
             if (list[i].type === DeviceType.Wifi) return list[i];
         return null;
     }
-    function connectedNet() {
+    // live connected network + its 0..1 signal (signalStrength notify drives
+    // the bar icon through wifiSignal)
+    readonly property var wifiNet: {
         if (!wifiDevice) return null;
         const nets = wifiDevice.networks.values;
         for (let i = 0; i < nets.length; i++)
             if (nets[i].connected) return nets[i];
         return null;
     }
+    readonly property real wifiSignal: wifiNet ? wifiNet.signalStrength : -1
 
     // ── battery (UPower populates ~3s after launch; percentage is 0..1) ──
     readonly property var batt: UPower.displayDevice
@@ -90,8 +93,8 @@ Pill {
         }
         if (name === "wifi") {
             if (!Networking.wifiEnabled) return "Wi-Fi off";
-            const net = connectedNet();
-            return net ? net.name + " (" + net.signalStrength + "% signal)" : "Wi-Fi on — not connected";
+            const net = root.wifiNet;
+            return net ? net.name + " (" + Math.round(net.signalStrength * 100) + "% signal)" : "Wi-Fi on — not connected";
         }
         if (name === "bt") {
             const a = Bluetooth.defaultAdapter;
@@ -238,7 +241,10 @@ Pill {
         height: 16
         NIcon {
             anchors.centerIn: parent
-            name: Networking.wifiEnabled ? "wifi" : "wifiOff"
+            // graded wifi glyph while connected; outline when the radio is on
+            // but nothing is connected (level -1)
+            name: Networking.wifiEnabled ? "wifiStrength" : "wifiOff"
+            level: root.wifiSignal
             iconSize: 15
         }
         TapHandler {
