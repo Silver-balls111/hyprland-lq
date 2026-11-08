@@ -153,7 +153,11 @@ PanelWindow {
                     Text {
                         width: parent.width
                         text: toastCard.summary !== "" ? toastCard.summary : toastCard.appName
-                        elide: Text.ElideRight
+                        // match NotifsPanel: summary un-truncates when the
+                        // card is expanded — no "…" on the title line either
+                        wrapMode: Text.Wrap
+                        elide: toastCard.expanded ? Text.ElideNone : Text.ElideRight
+                        maximumLineCount: toastCard.expanded ? 1000 : 1
                         color: toastCard.urgent ? Theme.danger : Theme.fg
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.textSize

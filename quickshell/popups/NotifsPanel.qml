@@ -39,7 +39,7 @@ Item {
     // reflows while anything is visible. (A normal ✕ keeps hop-up: its
     // survivors SHOULD move up.)
     property bool clearing: false
-    readonly property int staggerMs: 150
+    readonly property int staggerMs: 90
     function beginClear() {
         clearing = true;
         // one swipe = 240ms slide + 180ms fade; the last row's pause is
@@ -273,7 +273,11 @@ Item {
             }
 
             ScrollBar.vertical: ScrollBar {
-                policy: ScrollBar.AsNeeded
+                // explicit policy: AsNeeded maps the bar even when the content
+                // doesn't overflow the view (a one-notification list still
+                // showed a full-length handle) — drive it off actual scroll
+                policy: notifList.contentHeight > notifList.height
+                    ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
                 contentItem: Rectangle {
                     implicitWidth: 5
                     radius: 2.5
@@ -297,11 +301,16 @@ Item {
                 required property bool leaving
 
                 width: notifList.width - 14
-                // expansion grows DOWNWARD only: content is top-anchored, so
-                // the top edge stays put and rows below get pushed down
-                // (center-anchored content made the row grow both ways — the
-                // "bouncy" effect)
-                height: expanded ? contentCol.implicitHeight + 14 : 48
+                // height is CONTENT-SIZED in BOTH states — the clipping lives
+                // in the Texts, not the height — so expanding can only ever
+                // GROW a row (the old `expanded ? … : 48` SHRANK short /
+                // bodyless rows on click, 48 → ~33). The 48 floor only bites
+                // on title-only rows so the centered chip keeps breathing
+                // room; body rows are ~54+ collapsed anyway. Expansion grows
+                // DOWNWARD only: content is top-anchored, so the top edge
+                // stays put and rows below get pushed down (center-anchored
+                // content made the row grow both ways — the "bouncy" effect)
+                height: Math.max(48, contentCol.implicitHeight + 14)
                 radius: 12
                 color: rowMa.containsMouse ? Theme.rowHover : "transparent"
 
@@ -356,8 +365,9 @@ Item {
                     color: Theme.inputBg
                     anchors.left: parent.left
                     anchors.leftMargin: 6
-                    anchors.top: parent.top
-                    anchors.topMargin: 8
+                    // centered, not top-anchored: content-sized rows can be
+                    // shorter than the chip itself (title-only rows ~33px)
+                    anchors.verticalCenter: parent.verticalCenter
 
                     NIcon {
                         anchors.centerIn: parent
@@ -380,7 +390,13 @@ Item {
                     Text {
                         width: parent.width
                         text: notifRow.summary !== "" ? notifRow.summary : notifRow.appName
-                        elide: Text.ElideRight
+                        // un-truncates with the body when expanded: the title
+                        // was ALWAYS ElideRight, so long-summary notifs kept
+                        // their "…" even after expanding (the permalink to the
+                        // "grows but text stays elided" complaint)
+                        wrapMode: Text.Wrap
+                        elide: notifRow.expanded ? Text.ElideNone : Text.ElideRight
+                        maximumLineCount: notifRow.expanded ? 1000 : 1
                         color: notifRow.urgency === 2 ? Theme.danger : Theme.fg
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.textSize

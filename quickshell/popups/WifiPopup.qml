@@ -219,7 +219,10 @@ RicePopup {
             boundsBehavior: Flickable.StopAtBounds
             interactive: count > 5
             ScrollBar.vertical: ScrollBar {
-                policy: ScrollBar.AsNeeded
+                // explicit policy — see NotifsPanel: AsNeeded shows the bar
+                // even when the content doesn't overflow the view
+                policy: netList.contentHeight > netList.height
+                    ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
                 contentItem: Rectangle {
                     implicitWidth: 5
                     radius: 2.5
