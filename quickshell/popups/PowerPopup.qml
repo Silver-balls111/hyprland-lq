@@ -105,7 +105,13 @@ RicePopup {
             required property var modelData
             required property int index
 
-            width: actionList.width - 14
+            // lane reserved only while the bar actually shows (rule 6)
+            readonly property bool sbShown:
+                actionList.contentHeight > actionList.height
+            width: actionList.width - (sbShown ? 14 : 4)
+            Behavior on width {
+                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+            }
             height: 40
             radius: 12
             color: rowMa.containsMouse || index === root.selIndex

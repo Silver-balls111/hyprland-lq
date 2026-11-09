@@ -197,7 +197,13 @@ PanelWindow {
                     required property var modelData
                     required property int index
 
-                    width: menuList.width - 14
+                    // lane reserved only while the bar actually shows (rule 6)
+                    readonly property bool sbShown:
+                        menuList.contentHeight > menuList.height
+                    width: menuList.width - (sbShown ? 14 : 4)
+                    Behavior on width {
+                        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                    }
                     height: menuRow.modelData.isSeparator ? 9 : 34
 
                     Rectangle {

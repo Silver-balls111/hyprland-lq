@@ -45,12 +45,13 @@ real debugging session.
 5. `NotificationServer` is created ONCE at shell root; `Notifs.push` must
    record history **before** the DND/dashboard early return; `n.tracked = true`
    is not optional; every `n.expire()/dismiss()` wrapped in try/catch.
-6. Every scrollable list keeps delegates ~14 px narrower than the ListView
-   (the scrollbar lane) — and Flickables have NO `rightPadding`. Bind every
-   vertical ScrollBar's policy off actual scroll
-   (`<id>.contentHeight > <id>.height ? AlwaysOn : AlwaysOff`) —
-   `ScrollBar.AsNeeded` maps the bar even when nothing overflows (a
-   one-notif list showed a phantom full-length handle).
+6. Every scrollable list binds its vertical ScrollBar's policy off actual
+   scroll (`<id>.contentHeight > <id>.height ? AlwaysOn : AlwaysOff`) —
+   `ScrollBar.AsNeeded` maps the bar even when nothing overflows (a one-notif
+   list showed a phantom full-length handle). Delegates gate the scrollbar
+   lane the same way: `sbShown`-gated `width: <id>.width - (sbShown ? 14 : 4)`
+   — the 14px lane exists only while the bar shows (width animates via a
+   Behavior) — and Flickables still have NO `rightPadding`.
 7. Anchoring data (`wifiRightX` etc. on `StatusPill`, `anchorX` on `Bar`) is
    load-bearing — a NaN anchorX opens a popup *invisibly*. Do not delete.
 8. A `RicePopup` subclass `onVisibleChanged` handler shadows the base class's

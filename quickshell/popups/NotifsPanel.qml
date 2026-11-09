@@ -300,7 +300,14 @@ Item {
                 required property bool expanded
                 required property bool leaving
 
-                width: notifList.width - 14
+                // lane reserved only while the bar actually shows (rule 6) —
+                // otherwise the row takes the space minus a small inset
+                readonly property bool sbShown:
+                    notifList.contentHeight > notifList.height
+                width: notifList.width - (sbShown ? 14 : 4)
+                Behavior on width {
+                    NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                }
                 // height is CONTENT-SIZED in BOTH states — the clipping lives
                 // in the Texts, not the height — so expanding can only ever
                 // GROW a row (the old `expanded ? … : 48` SHRANK short /
