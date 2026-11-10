@@ -122,6 +122,9 @@ Pill {
             const conn = a.devices.values.filter(d => d.connected);
             return conn.length > 0 ? conn.map(d => d.name).join("\n") : "Bluetooth on — not connected";
         }
+        if (name === "mic") {
+            return root.micMuted ? "Microphone muted" : "Microphone on";
+        }
         if (name === "battery") return battTip();
         return "";
     }
@@ -248,6 +251,7 @@ Pill {
             }
         }
         HoverHandler {
+            onHoveredChanged: hovered ? root.tipEnter("mic", micBox) : root.tipLeave(micBox)
             cursorShape: Qt.PointingHandCursor
         }
     }

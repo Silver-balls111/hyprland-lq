@@ -46,7 +46,7 @@ Item {
     // calendar's worst-case (6-row) footprint and stretches it to the column
     // bottom; leftover height is distributed evenly between the profile block
     // and the three bar rows.
-    readonly property real profileH: 66
+    readonly property real profileH: 70 // matches the 70px avatar exactly
     readonly property real statH: 28 // label row 18 + 4 + bar 6
     readonly property real gap: Math.max(10, (height - profileH - 3 * statH) / 3)
 
