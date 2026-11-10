@@ -16,7 +16,7 @@
 //
 // Carousel: 11 recycled slots around a real-valued `centerPos` (animated
 // toward `selected`). Slot geometry is a pure function of the signed distance
-// d = wallIdx - centerPos, so positions/widths/shear morph continuously; the
+// d = slotPos - centerPos, so positions/widths/shear morph continuously; the
 // slot at the far edge teleports to the other side while its opacity is ~0.
 import QtQuick
 import Quickshell
@@ -290,27 +290,27 @@ PanelWindow {
         for (let i = 0; i < maxSlots; i++) {
             const s = slotRepeater.itemAt(i);
             if (!s) continue;
-            if (i >= count) { s.wallIdx = -1; continue; }
-            if (need.indexOf(s.wallIdx) !== -1) continue;
+            if (i >= count) { s.slotPos = -1; continue; }
+            if (need.indexOf(s.slotPos) !== -1) continue;
             // this slot's index drifted out of the window — give it the
             // needed index farthest from its current position
             let farthest = -1, bestDist = -1;
             for (const idx of need) {
                 if (slotAssigned(idx)) continue;
-                const dist = Math.abs(signedDist(idx, centerPos) - signedDist(s.wallIdx, centerPos));
+                const dist = Math.abs(signedDist(idx, centerPos) - signedDist(s.slotPos, centerPos));
                 if (dist > bestDist) {
                     bestDist = dist;
                     farthest = idx;
                 }
             }
-            if (farthest !== -1) s.wallIdx = farthest;
+            if (farthest !== -1) s.slotPos = farthest;
         }
     }
 
     function slotAssigned(idx) {
         for (let i = 0; i < maxSlots; i++) {
             const s = slotRepeater.itemAt(i);
-            if (s && s.wallIdx === idx) return true;
+            if (s && s.slotPos === idx) return true;
         }
         return false;
     }
@@ -430,8 +430,8 @@ PanelWindow {
         delegate: Item {
             id: slot
 
-            property int wallIdx: -1
-            readonly property real d: root.signedDist(wallIdx, root.centerPos)
+            property int slotPos: -1
+            readonly property real d: root.signedDist(slotPos, root.centerPos)
             readonly property real ad: Math.abs(d)
             readonly property real t: Math.min(ad, 1)          // 0 = center, 1 = full strip
             readonly property bool isCenter: ad < 0.5
@@ -440,7 +440,7 @@ PanelWindow {
             // the strips (skwd's whole plane shares one angle)
             readonly property real shearAmt: root.shearK
 
-            visible: wallIdx >= 0 && ad < 4.6
+            visible: slotPos >= 0 && ad < 4.6
             // the row ends at |d| = 4; the 5th slot is never shown — it only
             // exists as an invisible teleport target for recycling
             opacity: ad <= 4 ? 1 : Math.max(0, 1 - (ad - 4) * 2)
@@ -495,7 +495,7 @@ PanelWindow {
                         // one decodes — a bare slot flashes the desktop
                         // through as a black parallelogram
                         retainWhileLoading: true
-                        source: root.wallSource(slot.wallIdx)
+                        source: root.wallSource(slot.slotPos)
                         // decode at TWO FIXED role buckets, never the live
                         // animated width: the pixmap cache keys on
                         // (source, sourceSize), so a width-derived size
@@ -542,17 +542,16 @@ PanelWindow {
                 border.width: 1
                 border.color: Qt.rgba(1, 1, 1, 0.35)
                 // filename chip only on the focused wallpaper (pure visibility
-                // toggle — no image reloads involved). Compare against
-                // `selected` (a walls index) — wallIdx is a walls index, NOT
-                // a position within `shown` (differs under a search filter).
-                visible: slot.wallIdx === root.selected
+                // toggle — no image reloads involved). `slot.pos` and
+                // `selectedPos` are both positions within `shown`.
+                visible: slot.slotPos === root.selectedPos
 
                 Text {
                     id: chipText
                     anchors.centerIn: parent
                     width: Math.min(implicitWidth, chip.width - 10)
                     elide: Text.ElideRight
-                    text: slot.wallIdx >= 0 ? root.basename(root.walls[slot.wallIdx]) : ""
+                    text: slot.slotPos >= 0 ? root.basename(root.wallAt(slot.slotPos)) : ""
                     color: Qt.rgba(1, 1, 1, 0.92)
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.textSize
@@ -566,11 +565,11 @@ PanelWindow {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
                     if (slot.isCenter) { root.apply(); return; }
-                    // wallIdx is an index into `walls`; select() wants a
-                    // position within `shown` (differs under an active
-                    // search filter)
-                    const pos = root.shown.indexOf(slot.wallIdx);
-                    if (pos !== -1) root.select(pos);
+                    // slotPos IS a position within `shown` — the same domain
+                    // select() wants. (Renamed from the old `wallIdx`, which
+                    // read like a walls index and caused a repeated
+                    // misdiagnosis / wrong revert — see the SDD ledger.)
+                    root.select(slot.slotPos);
                 }
             }
         }
