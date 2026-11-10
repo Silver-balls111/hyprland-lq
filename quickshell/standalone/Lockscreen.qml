@@ -102,7 +102,11 @@ Item {
 
     SystemClock {
         id: clockObj
-        precision: SystemClock.Minutes
+        // Seconds, not Minutes: the Minutes timer pauses across suspend
+        // (CLOCK_MONOTONIC — quickshell issue #1212) and the lockscreen shows
+        // stale time for up to 60 s after wake — the first thing seen after
+        // resume. With Seconds the stale window is < 1 s; only hh:mm is shown.
+        precision: SystemClock.Seconds
     }
     readonly property var now: clockObj.date
     // hyprlock $TIME12 parity: 12-hour clock. Qt's "hh" is only 12-hour when

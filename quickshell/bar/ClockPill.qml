@@ -16,7 +16,11 @@ Pill {
 
     SystemClock {
         id: clockObj
-        precision: SystemClock.Minutes
+        // Seconds, not Minutes: the upstream Minutes timer pauses across
+        // suspend (CLOCK_MONOTONIC — quickshell issue #1212) and shows stale
+        // time for up to 60 s after wake; with Seconds the stale window is
+        // < 1 s. Text formatting only uses hh:mm, so nothing changes visually.
+        precision: SystemClock.Seconds
     }
 
     NIcon {
