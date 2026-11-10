@@ -169,7 +169,20 @@ PanelWindow {
     }
 
     // ---- navigation ----
-    onSelectedPosChanged: centerPos = selectedPos
+    // the visual center is UNBOUNDED: it accumulates so the carousel can roll
+    // seamlessly around the ring (last → first keeps going right instead of
+    // flying back across the whole strip). Every consumer reads it through
+    // signedDist()/mod(), which wrap it correctly — only ever assigned via
+    // rollCenterTo() (or a snap below).
+    onSelectedPosChanged: rollCenterTo(selectedPos)
+    // move the animated center to targetPos the SHORT way around the ring:
+    // stepping right at the last wallpaper rolls to centerPos = n (slot 0),
+    // a click on a distant strip rolls the long visible path, and with
+    // animateNav = false (filter snap, jump()) it simply teleports.
+    function rollCenterTo(targetPos) {
+        if (!shown.length) { centerPos = targetPos; return; }
+        centerPos = centerPos + signedDist(targetPos, centerPos);
+    }
     // THE actual filter hook — every keystroke rebuilds `shown`. (Without
     // this the query is just a string: the rebuild only ran on list-load,
     // which a seed-before-load test masks.)
