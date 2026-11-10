@@ -171,13 +171,15 @@ PanelWindow {
     }
     Timer {
         id: pollTimer
-        interval: 60
+        // 400ms steady-state baseline; speedUpPoll() below bursts it to 60ms
+        // while a change is being tracked (see pollBurst)
+        interval: 400
         running: root.backlightDevice !== ""
         repeat: true
         onTriggered: brightView.reload()
     }
     // adaptive rate: 60ms for ~1.5s after a detected change (feels instant
-    // during key holds, like the volume path), 400ms baseline otherwise
+    // during key holds, like the volume path), then back to the 400ms baseline
     Timer {
         id: pollBurst
         interval: 1500

@@ -147,7 +147,13 @@ QtObject {
             const list = root.activeToasts;
             root.activeToasts = [];
             for (let i = 0; i < list.length; i++) {
-                if (list[i].notif) { list[i].notif.expire(); list[i].notif = null; }
+                if (list[i].notif) {
+                    // same dead-wrapper guard as dismissToast/clearAll: a
+                    // server-side retire between push and this flip throws
+                    try { list[i].notif.expire(); }
+                    catch (err) { console.warn("dnd: notif wrapper already gone:", err); }
+                    list[i].notif = null;
+                }
             }
         }
     }
