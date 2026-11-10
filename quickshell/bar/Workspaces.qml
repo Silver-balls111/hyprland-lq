@@ -23,7 +23,9 @@ Pill {
         stdout: StdioCollector {
             onStreamFinished: {
                 const m = /Hyprland (\d+)\.(\d+)/.exec(text);
-                root.luaIpc = !(m && Number(m[2]) < 56);
+                // Lua IPC is 0.56+ — but only the 0.x^ line needs the flat
+                // fallback; a future "1.x.x" (or any non-0 major) is Lua
+                root.luaIpc = !(m && m[1] === "0" && Number(m[2]) < 56);
             }
         }
     }

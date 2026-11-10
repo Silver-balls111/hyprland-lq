@@ -101,6 +101,32 @@ Item {
                     leaving: false
                 });
         }
+        // order audit — the insert loop above assumes every missing entry
+        // already sits at/above the preserved rows (true for the common
+        // single-entry change, where the new state lands at index 0). If
+        // several entries went missing in one mutation, index i can be wrong
+        // and the row order corrupts: rebuild in one pass (the only cost —
+        // rare — is wiped per-row expanded state).
+        let inOrder = true;
+        for (let a = 0; a < want.length; a++) {
+            if (a >= historyModel.count || historyModel.get(a).entryId !== want[a].id) {
+                inOrder = false;
+                break;
+            }
+        }
+        if (!inOrder) {
+            historyModel.clear();
+            for (let j = 0; j < want.length; j++)
+                historyModel.append({
+                    entryId: want[j].id,
+                    appName: want[j].appName,
+                    summary: want[j].summary,
+                    body: want[j].body,
+                    urgency: want[j].urgency,
+                    expanded: false,
+                    leaving: false
+                });
+        }
     }
     // once the last swipe-out has finished, drop the whole model in one pass —
     // every row is already at opacity 0, so this triggers no visible animations

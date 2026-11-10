@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Widgets
 import Quickshell.Services.Pipewire
 import Quickshell.Services.UPower
@@ -71,6 +72,24 @@ Pill {
         }
         return s;
     }
+
+    // the user's terminal, probed once from their Hyprland Lua config
+    // (`terminal = "..."` in ~/.config/hypr/config/variables.lua); falls
+    // back to alacritty. Right-click nmtui/blueman land there.
+    property string terminalApp: "alacritty"
+    Process {
+        id: terminalProbe
+        command: ["sh", "-c",
+            'awk -F"=" \'/^\\s*terminal\\s*=/ {gsub(/[ \\t",]/, "", $2); if ($2 != "") {print $2; exit}}\'' +
+            ' "$HOME/.config/hypr/config/variables.lua" 2>/dev/null']
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const t = text.trim();
+                if (t !== "") root.terminalApp = t;
+            }
+        }
+    }
+    Component.onCompleted: terminalProbe.running = true
 
     // ── tooltips ──
     property string hoveredName: ""
@@ -253,7 +272,7 @@ Pill {
         TapHandler {
             acceptedButtons: Qt.RightButton
             // right-click: full network management (terminal = hypr $terminal)
-            onTapped: Quickshell.execDetached(["alacritty", "-e", "nmtui"])
+            onTapped: Quickshell.execDetached([root.terminalApp, "-e", "nmtui"])
         }
         HoverHandler {
             onHoveredChanged: hovered ? root.tipEnter("wifi", wifiBox) : root.tipLeave(wifiBox)
