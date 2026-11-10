@@ -89,10 +89,24 @@ Item {
     property string wallpaperPath: ""
 
     // ── adaptive text colors (readability on any wallpaper) ───────────────
-    // the wallpaper's average luminance is sampled once per lock (see
-    // lumSampler in the content); dark wallpapers get light text, light
-    // wallpapers keep the dark palette fg — no shadows, no cards (user spec)
-    property bool wallDark: false
+    // dark wallpapers get light text, light wallpapers keep the dark palette
+    // fg — no shadows, no cards (user spec).
+    // The darkness comes from matugen, which computed the scheme FROM this
+    // exact wallpaper (colors.json → Colors.md3): dark wallpaper ⇔ dark
+    // generated scheme. Sampling pixel luminance ourselves required a SECOND
+    // full-resolution decode of the wallpaper (the 16×9 Canvas was fed via
+    // loadImage(url), whose decode has no sourceSize control — it ran at the
+    // image's natural size, separate from the ~2048-wide blur Image) merely
+    // to read 144 pixels; this costs nothing.
+    // Still "transparent" (matugen never regen'd — no wallpaper yet): the
+    // backing is the black Rectangle below, so bright text is the correct
+    // fallback (was the old sampler's unloadable-wallpaper state too).
+    readonly property bool wallDark: {
+        const c = Colors.md3.background;
+        if (c === "transparent") return true;
+        const col = Qt.color(c);
+        return (0.2126 * col.r + 0.7152 * col.g + 0.0722 * col.b) < 0.5;
+    }
     readonly property color lockFg: wallDark ? "#f2f2f2" : Theme.fg
     readonly property color lockFgMuted: wallDark ? Qt.rgba(1, 1, 1, 0.62) : Theme.fgMuted
 
@@ -528,75 +542,10 @@ Item {
                 blur: 1.0
             }
 
-            // samples the wallpaper's average luminance once per load and
-            // flips root.wallDark, which drives lockFg/lockFgMuted above.
-            // THREE lifecycle traps (all hit): getContext() needs the canvas
-            // to be `available`, which is false during construction (real
-            // bar: content is created with the path already set → the
-            // sampled decode must wait for availability); in preview the
-            // path arrives late, so the load must also trigger from
-            // onWallUrlChanged; and a sample taken BEFORE the decode finished
-            // reads all-transparent pixels, whose 0-luminance would classify
-            // the wallpaper as dark FOREVER (one-way to true) — hence the
-            // zero-coverage retry below.
-            Canvas {
-                id: lumSampler
-                visible: false
-                width: 16
-                height: 9
-                readonly property string wallUrl: root.fileUrl(root.wallpaperPath)
-                property bool decodePending: false
-                property int retries: 0
-
-                onWallUrlChanged: {
-                    retries = 0;
-                    decodePending = false;
-                    if (wallUrl !== "") loadImage(wallUrl);
-                }
-                Component.onCompleted: {
-                    if (wallUrl !== "") { decodePending = true; loadImage(wallUrl); }
-                }
-                onImageLoaded: sample()
-                // canvas became usable while the decode was still pending —
-                // re-issue the load so onImageLoaded fires with it
-                onAvailableChanged: if (available && decodePending) loadImage(wallUrl)
-
-                function sample() {
-                    if (!available) { decodePending = true; return; }
-                    if (wallUrl === "") return;
-                    const ctx = getContext("2d");
-                    if (!ctx) { decodePending = true; return; }
-                    ctx.clearRect(0, 0, width, height);
-                    ctx.drawImage(wallUrl, 0, 0, width, height);
-                    const d = ctx.getImageData(0, 0, width, height).data;
-                    let sum = 0, covered = 0;
-                    for (let i = 0; i < d.length; i += 4) {
-                        sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
-                        if (d[i + 3] !== 0) covered++;
-                    }
-                    if (covered === 0) {
-                        // nothing decoded into the canvas yet — retry a few
-                        // times; if the wallpaper is genuinely unloadable the
-                        // background is the black backing, so bright text
-                        // (wallDark = true) is the correct fallback anyway
-                        if (retries < 5) {
-                            retries++;
-                            retryTimer.restart();
-                        } else {
-                            root.wallDark = true;
-                            decodePending = false;
-                        }
-                        return;
-                    }
-                    root.wallDark = sum / (d.length / 4) < 128;
-                    decodePending = false;
-                }
-                Timer {
-                    id: retryTimer
-                    interval: 250
-                    onTriggered: lumSampler.sample()
-                }
-            }
+            // luminance would previously be sampled here by a Canvas
+            // (lumSampler) — that was a second full-resolution decode of the
+            // wallpaper (Canvas loadImage has no sourceSize control). Text
+            // darkness now derives from the matugen scheme; see wallDark.
 
             // all UI overlays fade in/out TOGETHER inside this wrapper, while
             // the wallpaper below stays opaque — fading the whole content
