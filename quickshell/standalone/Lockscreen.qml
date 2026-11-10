@@ -59,7 +59,14 @@ Item {
     // rice is portable — no ~/Pictures dependency; drop any square-ish image
     // at <repo>/assets/pfp.png to replace the placeholder
     property string profilePhotoPath: Qt.resolvedUrl("../assets/pfp.png")
+    // property string weatherScript: ...(weather widget disabled)
     property string weatherScript: Quickshell.env("HOME") + "/.config/hypr/hyprlock/weather.sh"
+
+    // percent-encode each path segment — "#" truncates a file:// URL and raw
+    // spaces/other chars are rejected by Image/Canvas.loadImage
+    function fileUrl(p) {
+        return p !== "" ? "file://" + p.split("/").map(encodeURIComponent).join("/") : "";
+    }
 
     // ── test/preview overrides (throwaway instances set these) ────────────
     property bool testMode: Quickshell.env("LOCK_TEST") === "1" // overridable by preview instances
@@ -502,7 +509,7 @@ Item {
                 // empty path (content created before the awww query lands)
                 // must NOT become "file:///" — that logs "Path is a directory"
                 // and attempts a bogus load every lock
-                source: root.wallpaperPath !== "" ? "file://" + root.wallpaperPath : ""
+                source: root.fileUrl(root.wallpaperPath)
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 cache: true
@@ -533,8 +540,7 @@ Item {
                 visible: false
                 width: 16
                 height: 9
-                readonly property string wallUrl: root.wallpaperPath !== ""
-                    ? "file://" + root.wallpaperPath : ""
+                readonly property string wallUrl: root.fileUrl(root.wallpaperPath)
                 property bool decodePending: false
                 property int retries: 0
 

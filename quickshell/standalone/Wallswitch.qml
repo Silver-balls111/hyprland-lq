@@ -209,7 +209,7 @@ PanelWindow {
     }
 
     function wallSource(pos) {
-        return pos >= 0 && pos < shown.length ? "file://" + walls[shown[pos]] : "";
+        return pos >= 0 && pos < shown.length ? fileUrl(walls[shown[pos]]) : "";
     }
 
     // shortest wrap-around distance from pos to idx (within `shown`)
@@ -248,6 +248,13 @@ PanelWindow {
 
     function basename(p) {
         return p.slice(p.lastIndexOf("/") + 1);
+    }
+
+    // percent-encode each path segment: "#" truncates the file:// URL
+    // (fragment) and spaces/other chars must not appear raw (Image source,
+    // Canvas.loadImage). Split by "/", encode every segment, rejoin.
+    function fileUrl(p) {
+        return p !== "" ? "file://" + p.split("/").map(encodeURIComponent).join("/") : "";
     }
 
     // ---- apply ----
@@ -535,15 +542,17 @@ PanelWindow {
                 border.width: 1
                 border.color: Qt.rgba(1, 1, 1, 0.35)
                 // filename chip only on the focused wallpaper (pure visibility
-                // toggle — no image reloads involved)
-                visible: slot.wallIdx === root.selectedPos
+                // toggle — no image reloads involved). Compare against
+                // `selected` (a walls index) — wallIdx is a walls index, NOT
+                // a position within `shown` (differs under a search filter).
+                visible: slot.wallIdx === root.selected
 
                 Text {
                     id: chipText
                     anchors.centerIn: parent
                     width: Math.min(implicitWidth, chip.width - 10)
                     elide: Text.ElideRight
-                    text: slot.wallIdx >= 0 ? root.basename(root.wallAt(slot.wallIdx)) : ""
+                    text: slot.wallIdx >= 0 ? root.basename(root.walls[slot.wallIdx]) : ""
                     color: Qt.rgba(1, 1, 1, 0.92)
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.textSize
@@ -555,7 +564,14 @@ PanelWindow {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: slot.isCenter ? root.apply() : root.select(slot.wallIdx)
+                onClicked: {
+                    if (slot.isCenter) { root.apply(); return; }
+                    // wallIdx is an index into `walls`; select() wants a
+                    // position within `shown` (differs under an active
+                    // search filter)
+                    const pos = root.shown.indexOf(slot.wallIdx);
+                    if (pos !== -1) root.select(pos);
+                }
             }
         }
     }
