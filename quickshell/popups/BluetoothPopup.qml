@@ -40,6 +40,18 @@ RicePopup {
         if (devList.count > 0)
             devList.positionViewAtIndex(selIndex, ListView.Contain);
     }
+
+    // settle-gate for the delegate width Behavior — same trap as WifiPopup:
+    // devList is Layout-managed (width 0 while the Loader creates the
+    // delegates), so the first layout resolve would animate 0 → final on
+    // every row at open. After settle, genuine scrollbar-lane flips still
+    // animate as designed. (WifiPopup carries the full explanation.)
+    property bool widthSettled: false
+    Timer {
+        interval: 250
+        running: true
+        onTriggered: root.widthSettled = true
+    }
     onKeyPressed: event => {
         switch (event.key) {
         case Qt.Key_Down:
@@ -180,7 +192,9 @@ RicePopup {
                 readonly property bool sbShown:
                     devList.contentHeight > devList.height
                 width: devList.width - (sbShown ? 14 : 4)
+                // settle-gated — see widthSettled on the popup root
                 Behavior on width {
+                    enabled: root.widthSettled
                     NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
                 }
                 height: 40

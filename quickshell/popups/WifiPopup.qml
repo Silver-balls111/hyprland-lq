@@ -48,6 +48,21 @@ RicePopup {
         if (netList.count > 0)
             netList.positionViewAtIndex(selIndex, ListView.Contain);
     }
+
+    // The delegate width Behavior (scrollbar lane, rule 6) must NOT animate
+    // the popup's first layout resolve: netList is Layout-managed inside the
+    // ColumnLayout, so its width is 0 while the Loader creates the delegates
+    // (the layout pass runs later) — every row would animate 0 → final as a
+    // glitch right at open. The power popup never hits this: its list is
+    // anchor-based, width is already final when its delegates are born.
+    // After settle (created each open — Loader rebuilds the tree), genuine
+    // lane flips still animate as designed.
+    property bool widthSettled: false
+    Timer {
+        interval: 250
+        running: true
+        onTriggered: root.widthSettled = true
+    }
     onKeyPressed: event => {
         switch (event.key) {
         case Qt.Key_Down:
@@ -256,7 +271,9 @@ RicePopup {
                 readonly property bool sbShown:
                     netList.contentHeight > netList.height
                 width: netList.width - (sbShown ? 14 : 4)
+                // settle-gated — see widthSettled on the popup root
                 Behavior on width {
+                    enabled: root.widthSettled
                     NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
                 }
                 height: 38
