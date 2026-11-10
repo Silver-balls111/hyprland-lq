@@ -73,7 +73,18 @@ RicePopup {
     }
     onPendingChanged: if (!pending) refocusBody()
 
+    // list re-sorts/repopulates on every scan tick — keep the selection in
+    // range or Enter hits `undefined` and the highlight vanishes
+    Connections {
+        target: root
+        function onSortedNetworksChanged() {
+            if (selIndex >= root.sortedNetworks.length)
+                selIndex = Math.max(0, root.sortedNetworks.length - 1);
+        }
+    }
+
     function activate(net) {
+        if (!net) return; // selIndex was out of range (list just moved)
         if (net.connected) {
             net.disconnect();
             return;

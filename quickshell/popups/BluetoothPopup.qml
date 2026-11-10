@@ -64,7 +64,18 @@ RicePopup {
         }
     }
 
+    // list re-sorts/repopulates on every scan cycle — keep the selection in
+    // range or Enter hits `undefined` and the highlight vanishes
+    Connections {
+        target: root
+        function onSortedDevicesChanged() {
+            if (selIndex >= root.sortedDevices.length)
+                selIndex = Math.max(0, root.sortedDevices.length - 1);
+        }
+    }
+
     function activate(dev) {
+        if (!dev) return; // selIndex was out of range (list just moved)
         if (dev.connected) {
             dev.disconnect();
         } else if (dev.paired) {

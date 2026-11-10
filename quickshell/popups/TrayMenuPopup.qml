@@ -135,6 +135,7 @@ PanelWindow {
             id: body
             width: parent.width
             implicitHeight: Math.min(menuList.count, 5) * 36 + 20
+                + (root.stack.length > 0 ? 32 : 0) // Back row strip
             radius: Theme.popupRadius
             color: Theme.popupBg
             border.width: 1
@@ -171,7 +172,13 @@ PanelWindow {
             ListView {
                 id: menuList
                 anchors.fill: parent
-                anchors.margins: 10
+                // inside a submenu the Back row occupies the top strip —
+                // push the list below it or its first entry is covered
+                // (visually hidden, unclickable)
+                anchors.topMargin: root.stack.length > 0 ? 42 : 10
+                anchors.leftMargin: 10
+                anchors.rightMargin: 10
+                anchors.bottomMargin: 10
                 clip: true
                 spacing: 2
                 boundsBehavior: Flickable.StopAtBounds
