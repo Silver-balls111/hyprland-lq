@@ -8,7 +8,6 @@ Item {
     // Adaptive foreground supplied by the greeter (wallpaper luminance) — used
     // only at rest; the tinted hover/open fill restores the dark-on-light pair.
     property color fgColor: Theme.fg
-    signal wallpaperSaveRequested()
 
     width: open ? Math.max(powerPill.implicitWidth, popup.width) : powerPill.implicitWidth
     height: open ? (powerPill.implicitHeight + 10 + popup.height) : powerPill.implicitHeight
@@ -22,7 +21,6 @@ Item {
     ]
 
     function executeAction(act) {
-        root.wallpaperSaveRequested();
         root.open = false;
         Quickshell.execDetached(act.cmd);
     }
@@ -102,12 +100,6 @@ Item {
                             color: root.fgColor
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.textSize
-                        }
-
-                        Item {
-                            // spacer
-                            width: 1
-                            height: 1
                         }
                     }
 

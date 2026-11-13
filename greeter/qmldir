@@ -1,6 +1,7 @@
 singleton Colors 1.0 Colors.qml
 singleton Theme 1.0 Theme.qml
 singleton Icons 1.0 Icons.qml
+singleton GreeterState 1.0 GreeterState.qml
 NIcon 1.0 NIcon.qml
 Pill 1.0 Pill.qml
 RoundedImage 1.0 RoundedImage.qml

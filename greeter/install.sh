@@ -28,6 +28,13 @@ chmod 644 /etc/greetd/hyprland.conf
 chmod 644 /etc/greetd/hyprland.lua
 chmod -R a+rX /etc/greetd/greeter
 
+# Ensure the greeter user exists (greetd's package normally creates it; a
+# system-user fallback keeps a fresh machine from failing greetd at boot)
+if ! id "greeter" &>/dev/null; then
+    useradd -r -M -d /var/lib/greeter -s /usr/bin/nologin greeter
+    echo "    Created system user 'greeter'"
+fi
+
 # Add greeter user to video and input groups if not already
 if id "greeter" &>/dev/null; then
     usermod -a -G video,input greeter 2>/dev/null || true

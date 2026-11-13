@@ -1,32 +1,34 @@
 import QtQuick
 import QtQuick.Effects
 import Quickshell
-import Quickshell.Io
-import Quickshell.Services.Greetd
 import Quickshell.Services.UPower
 
 Item {
     id: root
 
-    // ── Session & User state ───────────────────────────────────────────────
-    property var users: []
-    property string currentUser: ""
-    property var sessions: []
-    property var currentSession: null
-    property string wallpaperPath: ""
+    // The one-per-system state singleton (discovery procs + Greetd auth
+    // machine + typed buffer). shell.qml spawns one Greeter per monitor;
+    // without hoisting, the instances would cancel each other's live
+    // Greetd sessions and race their discovery procs.
+    readonly property QtObject gs: GreeterState
+
+    // Pure UI over the singleton; all of these are read-only forwards.
+    readonly property var users: gs.users
+    readonly property string currentUser: gs.currentUser
+    readonly property var sessions: gs.sessions
+    readonly property var currentSession: gs.currentSession
+    readonly property string wallpaperPath: gs.wallpaperPath
+    readonly property string buffer: gs.buffer
     property bool wallDark: false
 
     readonly property color lockFg: wallDark ? "#f2f2f2" : Theme.fg
     readonly property color lockFgMuted: wallDark ? Qt.rgba(1, 1, 1, 0.62) : Theme.fgMuted
 
-    // ── Auth state ─────────────────────────────────────────────────────────
-    property string buffer: ""
-    // idle | authenticating | failed | launching
-    property string authState: "idle"
-    property string pendingPassword: ""
-    property bool capsOn: false
+    // Auth state + caps lock live in the singleton (keyboard can land on any
+    // screen; the auth machine is global)
+    readonly property string authState: gs.authState
 
-    // Public knob for the dropdown state (test harness pokes it — same
+    // Public knobs for the dropdown state (test harness pokes it — same
     // pattern as the lockscreen's test hooks)
     property alias userMenuOpen: userSelector.open
     property alias sessionMenuOpen: sessionSelector.open
@@ -55,6 +57,9 @@ Item {
     Keys.onPressed: event => handleKey(event)
 
     function handleKey(event) {
+        // While any popup is open the keyboard belongs to the menus: Esc
+        // closes them and Return is swallowed (accidental submit while the
+        // dropdown is open must not log you in with a stale user).
         if (sessionSelector.open || powerMenu.open || userSelector.open) {
             if (event.key === Qt.Key_Escape) {
                 sessionSelector.open = false;
@@ -63,305 +68,24 @@ Item {
                 event.accepted = true;
                 return;
             }
-        }
-
-        const k = event.key;
-        if (k === Qt.Key_CapsLock) {
-            event.accepted = true;
-            capsOn = !capsOn;
-            return;
-        }
-        if (k === Qt.Key_Escape) {
-            event.accepted = true;
-            buffer = "";
-            if (authState === "failed") authState = "idle";
-            return;
-        }
-        if (k === Qt.Key_Backspace) {
-            event.accepted = true;
-            buffer = (event.modifiers & Qt.ControlModifier) ? "" : buffer.slice(0, -1);
-            return;
-        }
-        if (k === Qt.Key_U && (event.modifiers & Qt.ControlModifier)) {
-            event.accepted = true;
-            buffer = "";
-            return;
-        }
-        if (k === Qt.Key_Return || k === Qt.Key_Enter) {
-            event.accepted = true;
-            submit();
-            return;
-        }
-        if (event.text.length === 1 && event.text >= " "
-            && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) {
-            event.accepted = true;
-            // Typing after a failure starts the next attempt
-            if (authState === "failed") authState = "idle";
-            if (buffer.length < 64) buffer += event.text;
-        }
-    }
-
-    // ── Greetd Authentication logic ────────────────────────────────────────
-    function startAuth(username) {
-        if (!username) return;
-        currentUser = username;
-        buffer = "";
-        authState = "idle";
-        pendingPassword = "";
-
-        if (!Greetd.available) {
-            console.warn("greeter: Running in standalone / test preview mode (no Greetd socket)");
-            return;
-        }
-
-        if (Greetd.state !== GreetdState.Inactive) {
-            try { Greetd.cancelSession(); } catch(e) {}
-        }
-        Greetd.createSession(username);
-    }
-
-    function submit() {
-        if (buffer === "" || authState === "authenticating" || authState === "launching") return;
-
-        if (!Greetd.available) {
-            // Preview mode test simulation
-            authState = "authenticating";
-            testTimer.restart();
-            return;
-        }
-
-        if (Greetd.state === GreetdState.Authenticating) {
-            authState = "authenticating";
-            Greetd.respond(buffer);
-        } else {
-            pendingPassword = buffer;
-            if (Greetd.state === GreetdState.Inactive) {
-                Greetd.createSession(currentUser);
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                event.accepted = true;
+                return;
             }
         }
+        gs.handleKey(event);
     }
 
-    Timer {
-        id: testTimer
-        interval: 700
-        onTriggered: {
-            root.authState = "failed";
-            root.buffer = "";
-        }
-    }
+    // ── Greetd-driven functions forwarded from GreeterState ────────────────
+    function startAuth(uname) { gs.startAuth(uname); }
+    function submit() { gs.submit(); }
 
-    Timer {
-        id: retryTimer
-        interval: 1000
-        onTriggered: {
-            if (Greetd.available && Greetd.state === GreetdState.Inactive) {
-                Greetd.createSession(root.currentUser);
-            }
-        }
-    }
+    function saveLastState() { gs.saveLastState(); }
 
-    Connections {
-        target: Greetd
-        function onAuthMessage(message, error, responseRequired, echoResponse) {
-            if (responseRequired) {
-                if (root.pendingPassword !== "") {
-                    const pw = root.pendingPassword;
-                    root.pendingPassword = "";
-                    root.authState = "authenticating";
-                    Greetd.respond(pw);
-                }
-            }
-        }
-        function onAuthFailure(message) {
-            console.warn("greeter: auth failed:", message);
-            // Plain "Login Failed" feedback: the field is cleared and stays in
-            // the failed state until the user types again (handleKey resets it)
-            root.authState = "failed";
-            root.buffer = "";
-            root.pendingPassword = "";
-            retryTimer.restart();
-        }
-        function onReadyToLaunch() {
-            root.authState = "launching";
-            root.saveLastState();
-
-            const cmd = root.getCommandList(root.currentSession ? root.currentSession.exec : "Hyprland");
-            const env = root.getSessionEnv(root.currentSession);
-            Greetd.launch(cmd, env, true);
-        }
-        function onError(error) {
-            console.warn("greeter: Greetd error:", error);
-            root.authState = "failed";
-        }
-    }
-
-    function getCommandList(execStr) {
-        if (!execStr) return ["Hyprland"];
-        return execStr.trim().split(/\s+/);
-    }
-
-    function getSessionEnv(session) {
-        const env = [];
-        if (session && session.type === "wayland") {
-            env.push("XDG_SESSION_TYPE=wayland");
-            if (session.name.toLowerCase().includes("hyprland")) {
-                env.push("XDG_CURRENT_DESKTOP=Hyprland");
-                env.push("XDG_SESSION_DESKTOP=Hyprland");
-            }
-        } else {
-            env.push("XDG_SESSION_TYPE=x11");
-        }
-        return env;
-    }
-
-    function saveLastState() {
-        if (!currentUser) return;
-        const sessionName = currentSession ? currentSession.name : "Hyprland";
-        stateSaverProc.command = ["sh", "-c",
-            'mkdir -p /var/cache/greetd 2>/dev/null || true; ' +
-            'echo "$1" > /var/cache/greetd/last-user 2>/dev/null || true; ' +
-            'echo "$2" > /var/cache/greetd/last-session 2>/dev/null || true',
-            "sh", currentUser, sessionName
-        ];
-        stateSaverProc.running = true;
-    }
-
-    Process { id: stateSaverProc; command: [] }
-
-    // ── Wallpaper discovery process ────────────────────────────────────────
-    // Live system reads /var/cache/greetd/wallpaper (copied directly with mode 644).
-    // In preview mode or fallbacks, query awww or search ~/Pictures/wallpapers.
-    Process {
-        id: wallpaperFinderProc
-        command: ["sh", "-c",
-            'p=""; ' +
-            'if [ -f /var/cache/greetd/wallpaper ]; then ' +
-            '    p=/var/cache/greetd/wallpaper; ' +
-            'elif command -v awww >/dev/null 2>&1 && [ -n "$(awww query 2>/dev/null)" ]; then ' +
-            '    p=$(awww query 2>/dev/null | grep -oP "(?<=image: ).*" | head -n 1 || true); ' +
-            'elif [ -f /var/cache/greetd/wallpaper-path ] && [ -f "$(cat /var/cache/greetd/wallpaper-path 2>/dev/null)" ]; then ' +
-            '    p=$(cat /var/cache/greetd/wallpaper-path); ' +
-            'elif [ -f /tmp/greetd-wallpaper.png ]; then ' +
-            '    p=/tmp/greetd-wallpaper.png; ' +
-            'fi; ' +
-            'echo "$p"']
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const p = text.trim();
-                if (p !== "") {
-                    root.wallpaperPath = p;
-                } else {
-                    root.wallpaperPath = Qt.resolvedUrl("assets/wallpaper.jpg");
-                }
-            }
-        }
-    }
-
-    // ── User discovery process ─────────────────────────────────────────────
-    Process {
-        id: usersProbe
-        command: ["python3", "-c",
-            'import pwd, json, os\n' +
-            'users = []\n' +
-            'for p in pwd.getpwall():\n' +
-            '    if 1000 <= p.pw_uid < 60000 and not p.pw_shell.endswith("nologin") and not p.pw_shell.endswith("false"):\n' +
-            '        avatar = ""\n' +
-            '        for fp in [os.path.join(p.pw_dir, ".face"), os.path.join(p.pw_dir, ".face.icon")]:\n' +
-            '            if os.path.exists(fp):\n' +
-            '                avatar = fp\n' +
-            '                break\n' +
-            '        users.append({\n' +
-            '            "name": p.pw_name,\n' +
-            '            "gecos": p.pw_gecos.split(",")[0] if p.pw_gecos else p.pw_name,\n' +
-            '            "uid": p.pw_uid,\n' +
-            '            "home": p.pw_dir,\n' +
-            '            "avatar": avatar\n' +
-            '        })\n' +
-            'last_user = ""\n' +
-            'if os.path.exists("/var/cache/greetd/last-user"):\n' +
-            '    try:\n' +
-            '        with open("/var/cache/greetd/last-user") as f: last_user = f.read().strip()\n' +
-            '    except: pass\n' +
-            'print(json.dumps({"users": users, "lastUser": last_user}))\n'
-        ]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    const data = JSON.parse(text);
-                    root.users = data.users || [];
-                    let picked = data.lastUser;
-                    if (!picked || !root.users.find(u => u.name === picked)) {
-                        picked = root.users.length > 0 ? root.users[0].name : "bandit";
-                    }
-                    root.currentUser = picked;
-                    root.startAuth(picked);
-                } catch(e) {
-                    console.warn("greeter: user parse failed:", e);
-                    root.currentUser = "bandit";
-                    root.startAuth("bandit");
-                }
-            }
-        }
-    }
-
-    // ── Sessions discovery process ─────────────────────────────────────────
-    Process {
-        id: sessionsProbe
-        command: ["python3", "-c",
-            'import glob, os, json\n' +
-            'sessions = []\n' +
-            'files = glob.glob("/usr/share/wayland-sessions/*.desktop") + glob.glob("/usr/share/xsessions/*.desktop")\n' +
-            'for f in sorted(files):\n' +
-            '    try:\n' +
-            '        name, exec_cmd = "", ""\n' +
-            '        with open(f, "r", encoding="utf-8", errors="ignore") as fp:\n' +
-            '            for line in fp:\n' +
-            '                line = line.strip()\n' +
-            '                if line.startswith("Name=") and not name:\n' +
-            '                    name = line.split("=", 1)[1]\n' +
-            '                elif line.startswith("Exec=") and not exec_cmd:\n' +
-            '                    exec_cmd = line.split("=", 1)[1]\n' +
-            '        stype = "wayland" if "wayland" in f else "x11"\n' +
-            '        if name and exec_cmd:\n' +
-            '            sessions.append({"name": name, "exec": exec_cmd, "type": stype, "file": f})\n' +
-            '    except: pass\n' +
-            'if not sessions:\n' +
-            '    sessions = [{"name": "Hyprland", "exec": "/usr/bin/start-hyprland", "type": "wayland"}]\n' +
-            'last_session = ""\n' +
-            'if os.path.exists("/var/cache/greetd/last-session"):\n' +
-            '    try:\n' +
-            '        with open("/var/cache/greetd/last-session") as f: last_session = f.read().strip()\n' +
-            '    except: pass\n' +
-            'print(json.dumps({"sessions": sessions, "lastSession": last_session}))\n'
-        ]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    const data = JSON.parse(text);
-                    root.sessions = data.sessions || [];
-                    let picked = null;
-                    if (data.lastSession) {
-                        picked = root.sessions.find(s => s.name === data.lastSession);
-                    }
-                    if (!picked) {
-                        // Default preference: Hyprland, then Hyprland (uwsm-managed)
-                        picked = root.sessions.find(s => s.name === "Hyprland")
-                            || root.sessions.find(s => s.name === "Hyprland (uwsm-managed)")
-                            || (root.sessions.length > 0 ? root.sessions[0] : { name: "Hyprland", exec: "/usr/bin/start-hyprland", type: "wayland" });
-                    }
-                    root.currentSession = picked;
-                } catch(e) {
-                    console.warn("greeter: sessions parse failed:", e);
-                    root.currentSession = { name: "Hyprland", exec: "/usr/bin/start-hyprland", type: "wayland" };
-                }
-            }
-        }
-    }
-
-    Component.onCompleted: {
-        wallpaperFinderProc.running = true;
-        usersProbe.running = true;
-        sessionsProbe.running = true;
+    // Percent-encode each path segment — a wallpaper under a directory with
+    // spaces or a '#' breaks a bare "file://" + path URL
+    function wallUrl(path) {
+        return gs.fileUrl(path);
     }
 
     // ── Background: blurred wallpaper (matching Lockscreen.qml) ───────────
@@ -371,11 +95,17 @@ Item {
         id: wall
         visible: false
         anchors.fill: parent
-        anchors.margins: -64
-        source: root.wallpaperPath !== "" ? (root.wallpaperPath.startsWith("/") ? "file://" + root.wallpaperPath : root.wallpaperPath) : ""
+        anchors.margins: -64 // blur samples transparent padding at edges
+        source: root.wallpaperPath !== "" ? root.wallUrl(root.wallpaperPath) : ""
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
         cache: true
+        // Same downsampling as Lockscreen: decode bounded to ~window width
+        // instead of the native 4K/8K decode. A full-res decode gets aliased
+        // while scaling into the window, and blur applied on top of that
+        // aliasing reads as an "oil painting" smear.
+        sourceSize.width: Math.max(128, Math.round((root.width + 128) / 128) * 128)
+        sourceSize.height: 0
     }
 
     MultiEffect {
@@ -545,7 +275,7 @@ Item {
                 rounding: 40
                 source: {
                     const u = root.users.find(x => x.name === root.currentUser);
-                    if (u && u.avatar) return (u.avatar.startsWith("/") ? "file://" + u.avatar : u.avatar);
+                    if (u && u.avatar) return gs.fileUrl(u.avatar);
                     return Qt.resolvedUrl("assets/pfp.png");
                 }
             }
@@ -621,6 +351,9 @@ Item {
 
                 // Submit arrow — reserved lane on the right so dots never
                 // sit under it. Dots flick horizontally in the leftover width.
+                // Adaptive fill: light glass on a dark wallpaper, dark glass
+                // on a light one — a fixed white circle went near-invisible
+                // on light wallpapers.
                 Rectangle {
                     id: submitBtn
                     anchors.right: parent.right
@@ -629,11 +362,13 @@ Item {
                     width: 34
                     height: 34
                     radius: 17
-                    color: (submitMouse.containsMouse || submitTap.pressed)
-                        ? Qt.rgba(1, 1, 1, 0.28)
-                        : Qt.rgba(1, 1, 1, 0.16)
+                    color: root.wallDark
+                        ? (submitMouse.containsMouse || submitTap.pressed
+                            ? Qt.rgba(1, 1, 1, 0.28) : Qt.rgba(1, 1, 1, 0.16))
+                        : (submitMouse.containsMouse || submitTap.pressed
+                            ? Qt.rgba(0, 0, 0, 0.30) : Qt.rgba(0, 0, 0, 0.18))
                     border.width: 1
-                    border.color: Qt.rgba(1, 1, 1, 0.22)
+                    border.color: root.wallDark ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(0, 0, 0, 0.26)
                     visible: root.buffer.length > 0 && root.authState !== "launching"
                     z: 2
 
@@ -753,7 +488,7 @@ Item {
         // Caps Lock warning
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            visible: root.capsOn
+            visible: gs.capsOn
             text: "Caps Lock active"
             color: Theme.urgent
             font.family: Theme.fontFamily
@@ -795,8 +530,8 @@ Item {
         fgMutedColor: root.lockFgMuted
         onOpenChanged: if (open) userSelector.open = false;
         onSessionSelected: sess => {
-            root.currentSession = sess;
-            root.saveLastState();
+            gs.currentSession = sess;
+            gs.saveLastState();
         }
     }
 
@@ -809,8 +544,5 @@ Item {
         anchors.margins: 28
         fgColor: root.lockFg
         onOpenChanged: if (open) userSelector.open = false;
-        onWallpaperSaveRequested: {
-            root.saveLastState();
-        }
     }
 }

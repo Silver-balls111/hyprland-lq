@@ -26,8 +26,9 @@ mode, see gotchas).
 
 | File | Role |
 |---|---|
-| `shell.qml` | Entry point. One fullscreen `FloatingWindow` per screen (Cage is an XDG toplevel kiosk and does not implement `wlr-layer-shell`). `//@ pragma UseQApplication` required. |
-| `Greeter.qml` | Everything: clock/date, battery, background + luminance sampler, user/password center column, Greetd auth state machine, wallpaper/user/session discovery Processes, state persistence (`/var/cache/greetd/last-user`, `last-session`). |
+| `shell.qml` | Entry point. One fullscreen `FloatingWindow` per screen (Cage is an XDG toplevel kiosk and does not implement `wlr-layer-shell`). `//@ pragma UseQApplication` required. Calls `GreeterState.init()` on completion — singletons do nothing until first touched. |
+| `Greeter.qml` | Per-screen UI only: clock/date, battery, background + luminance sampler, user/password column, popups. Forwards keyboard events (minus the popup Esc/Enter interception) and binds to `GreeterState`. |
+| `GreeterState.qml` | Singleton holding everything that must be ONE per system, even multi-screen: wallpaper/user/session discovery Processes, the Greetd auth state machine, the typed buffer, caps-lock state, `retryTimer`/`testTimer`, and `saveLastState()`. Without hoisting, one greeter per monitor would cancel each other's live Greetd sessions. |
 | `UserSelector.qml` | **Dropdown panel** (not a modal) placed in the center Column between the user pill and the password field. 3 rows visible, scrollable beyond (delegates 14px narrower than the list — scrollbar lane convention). |
 | `SessionSelector.qml` | Bottom-left Pill + popup listing wayland/x11 sessions from `/usr/share/{wayland-sessions,xsessions}/*.desktop`. Transparent at rest, blends into wallpaper with adaptive `lockFg`/`lockFgMuted`. |
 | `PowerMenu.qml` | Bottom-right Pill + popup: poweroff/reboot/suspend/hibernate via `Quickshell.execDetached(["systemctl", ...])`. Transparent at rest, blends into wallpaper with adaptive `lockFg`. |
@@ -46,7 +47,7 @@ The login screen reads `/var/cache/greetd/wallpaper`, which is an atomic symlink
 - No image data is copied, preserving disk writes and keeping switches instantaneous.
 - **Atomic updates**: `Actions.applyWallpaper` and `Actions.syncGreetdWallpaper()` in `quickshell/core/Actions.qml` update the symlink via `ln -sfn "$WALL" /var/cache/greetd/.wallpaper.tmp && mv -Tf ... /var/cache/greetd/wallpaper`.
 - **Permissions**: `install.sh` grants user `greeter` directory traversal permissions on `/home/<user>` (`setfacl -m u:greeter:--x`) and read permissions on `/home/<user>/Pictures` (`setfacl -R -m u:greeter:rX`), enabling `greeter` to read the symlinked target directly without copying.
-- **Rendering**: The wallpaper is rendered crisp and unblurred in full native resolution (no full-screen blur `MultiEffect`).
+- **Rendering**: Identical blur stack to `Lockscreen.qml`: `MultiEffect` (`blurMax: 64`, `blur: 1.0`, `anchors.margins: -64`) **plus the same `sourceSize` downsample** (`width = round((win+128)/128)*128`, `height: 0`). The downsample is not optional: without it the image decodes at native 4K/8K resolution, the scale-down into the window aliases, and blur applied over the aliasing reads as an "oil painting" smear.
 - In preview mode, the greeter resolves `/var/cache/greetd/wallpaper` directly or falls back to `awww query` / `assets/wallpaper.jpg`.
 
 ## User Avatar (pfp.png and ~/.face)
@@ -58,9 +59,11 @@ The avatar circle in `Greeter.qml` and `UserSelector.qml` displays:
 
 ## Auth flow & the "Login Failed" contract (user-specified — do not decorate)
 
-- States: `idle | authenticating | failed | launching`. `authenticating` is
-  internal only (blocks double-submit) — there is no "Verifying" UI. On
-  failure the buffer is cleared and the field shows plain red **"Login
+- States: `idle | authenticating | failed | launching`. The whole state
+  machine lives in `GreeterState` (singleton) — `Greeter.qml` is UI only.
+  `authenticating` is internal only (blocks double-submit) — there is no
+  "Verifying" UI. On failure (PAM **or** a Greetd `onError`) the buffer is
+  cleared and the field shows plain red **"Login
   Failed"** — the ONLY feedback. No gradient ring, no fade animation, no
   auto-reset timer (all removed 2026-10-08 at the user's request). The
   failed state clears the moment the user types again (`handleKey` resets
@@ -69,13 +72,19 @@ The avatar circle in `Greeter.qml` and `UserSelector.qml` displays:
 - PAM errors etc. go to `console.warn` only, never on screen.
 - `startAuth(user)` cancels any live session and `createSession`s the picked
   user; `submit()` responds when Authenticating, or parks the password in
-  `pendingPassword` and answers the first `authMessage` (greetd races).
+  `pendingPassword` and answers the first `authMessage` (greetd races) —
+  and no-ops when `currentUser` is empty (empty/failed user list; the
+  fallback is the first discovered user or "", never a hard-coded name).
+  `Greeter` also swallows Enter while any popup is open — a login must not
+  fire through an open menu.
 - After a failure, `retryTimer` re-creates the session after 1s so the next
   password works without re-selecting the user.
 - On `readyToLaunch`: persist last-user/last-session, then
   `Greetd.launch(cmdList, env, true)`. Session exec strings are split on
   whitespace; env gets `XDG_SESSION_TYPE` (+ Hyprland desktop vars for
-  wayland Hyprland sessions).
+  wayland Hyprland sessions). `PowerMenu` does NOT emit a wallpaper-save
+  signal — that signal/handler pair was leftover scaffolding and is gone;
+  power actions just `execDetached` systemctl.
 
 ## Popup conventions
 
@@ -90,8 +99,9 @@ The avatar circle in `Greeter.qml` and `UserSelector.qml` displays:
 - Opening any popup (user dropdown, session, power) closes the other two —
   wired via each component's `onOpenChanged`. Keep that exclusivity when
   adding popups.
-- Esc closes popups first; only with none open does it clear the password
-  buffer.
+- Esc closes popups first; with none open it clears the password buffer
+  (popup keyboard interception lives in `Greeter.handleKey`, the rest of
+  the flow in `GreeterState.handleKey`).
 - The user dropdown lives **inside the center Column** (not an overlay), so
   the password field shifts down only while it's open — matches the
   reference mockup; don't move it to a centered modal. It has no solid background
@@ -114,8 +124,9 @@ The avatar circle in `Greeter.qml` and `UserSelector.qml` displays:
   verification needs a wait); percentage is 0–1. Icon = same Nerd Font
   `batteryGlyph` set as the bar — keep them in sync.
 - Test harness pattern: a throwaway `/tmp/*.qml` PanelWindow that imports
-  this dir via `file:` URL and drives `Greeter`'s public properties
-  (`users`, `userMenuOpen` alias, `authState`, `buffer`) on Timers. Don't
+  this dir via `file:` URL and drives `Greeter`'s UI knobs (`userMenuOpen`
+  alias) and `GreeterState`'s state (`users`, `authState`, `buffer` —
+  `Greeter.authState`/`buffer` are read-only forwards now) on Timers. Don't
   add test files to the repo, and kill the instance when done (check
   `pgrep -ax qs` — the real bar is `qs -c rice`).
 - `hyprctl dispatch 'hl.dsp.exit()'` (descriptor form) is required in the
@@ -133,6 +144,6 @@ The avatar circle in `Greeter.qml` and `UserSelector.qml` displays:
   `Pill`/Theme tokens rather than ad-hoc styling.
 - The clock matches the lockscreen: `y = height * 0.10`, time/AMPM 75px.
 - Long passwords: dots match `quickshell/standalone/Lockscreen.qml` with 10px diameter, `spacing: 3`, `lockFgMuted` at 0.9 opacity, in a clipped horizontal Flickable that leaves a reserved lane for the submit arrow. Note: manual horizontal scrolling / flicking on the dots does not work reliably in this layer-shell environment; documented per user instruction — do not attempt to fix.
-- **Wallpaper Blur**: Wallpaper uses the exact same `MultiEffect` blur as `Lockscreen.qml` (`blurMax: 64`, `blur: 1.0`, `anchors.margins: -64`) over the full-resolution image without downsampling.
+- **Wallpaper Blur**: Wallpaper uses the exact same blur stack as `Lockscreen.qml` (`blurMax: 64`, `blur: 1.0`, `anchors.margins: -64`) **including the `sourceSize` downsample** — a full-res decode aliases when scaled into the window and blurring over that aliasing looks like an oil painting (fixed 2026-11-09).
 - **Qt Platform (`QT_QPA_PLATFORM=wayland`)**: Running quickshell on a TTY or kiosk without setting `QT_QPA_PLATFORM=wayland` causes Qt to look for an X11 display and fail with `Could not load the Qt platform plugin "xcb" in "" even though it was found`. Greetd's `config.toml` must explicitly export `QT_QPA_PLATFORM=wayland`.
 - **Compositor and Tap-to-Click**: Cage is a barebones kiosk compositor that does not configure libinput tap-to-click (physical clicks work, but tap gestures are ignored by libinput). For full touchpad tap-to-click support, `hyprland.lua` and `hyprland.conf` include `touchpad { tap_to_click = true }`.

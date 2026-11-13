@@ -84,7 +84,10 @@ Item {
                 required property var modelData
                 required property int index
 
-                width: sessionList.width
+                // Delegates shift out of the scrollbar lane only while the
+                // list actually overflows (same lane convention as the bar)
+                readonly property bool sbShown: sessionList.contentHeight > sessionList.height
+                width: sessionList.width - (sbShown ? 14 : 0)
                 height: 38
                 radius: 12
                 readonly property bool isSelected: root.currentSession && root.currentSession.name === modelData.name
@@ -102,7 +105,7 @@ Item {
 
                     NIcon {
                         anchors.verticalCenter: parent.verticalCenter
-                        name: modelData.type === "wayland" ? "wayland" : "desktop"
+                        name: modelData.type === "wayland" ? "wayland" : "x11"
                         iconSize: 14
                         iconColor: isSelected ? root.fgColor : root.fgMutedColor
                     }
@@ -144,6 +147,20 @@ Item {
                         root.open = false;
                     }
                 }
+            }
+
+            // Policy bound off actual scroll — AsNeeded showed a phantom
+            // full-length handle when nothing overflows (hard rule 6)
+            ScrollBar.vertical: ScrollBar {
+                policy: sessionList.contentHeight > sessionList.height
+                    ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                implicitWidth: 6
+                contentItem: Rectangle {
+                    implicitWidth: 6
+                    radius: 3
+                    color: Theme.rowHover
+                }
+                background: Item {}
             }
         }
     }

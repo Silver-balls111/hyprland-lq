@@ -80,7 +80,7 @@ Rectangle {
                         anchors.fill: parent
                         rounding: 14
                         source: {
-                            if (modelData.avatar) return (modelData.avatar.startsWith("/") ? "file://" + modelData.avatar : modelData.avatar);
+                            if (modelData.avatar) return GreeterState.fileUrl(modelData.avatar);
                             return Qt.resolvedUrl("assets/pfp.png");
                         }
                     }
@@ -124,7 +124,12 @@ Rectangle {
             }
         }
 
+        // Policy bound off actual scroll — ScrollBar.AsNeeded maps the bar
+        // even when nothing overflows (phantom full-length handle, see the
+        // bar's hard rule 6)
         ScrollBar.vertical: ScrollBar {
+            policy: userList.contentHeight > userList.height
+                ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
             implicitWidth: 6
             contentItem: Rectangle {
                 implicitWidth: 6
