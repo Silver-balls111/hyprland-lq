@@ -22,6 +22,23 @@ cp -f "$SCRIPT_DIR/hyprland.conf" /etc/greetd/hyprland.conf
 cp -f "$SCRIPT_DIR/hyprland.lua" /etc/greetd/hyprland.lua
 cp -f "$SCRIPT_DIR/config.toml" /etc/greetd/config.toml
 
+echo "==> Installing greetd PAM stack (gnome-keyring unlock at login)..."
+# Ship the greetd PAM stack with pam_gnome_keyring so the login keyring
+# unlocks with the password typed at the greeter (auth + session auto_start;
+# both optional — failures degrade to a locked keyring, not a failed login).
+# The distro original is preserved once at greetd.pambackup.
+if [ ! -f /etc/pam.d/greetd.pambackup ]; then
+    cp -f /etc/pam.d/greetd /etc/pam.d/greetd.pambackup
+fi
+cp -f "$SCRIPT_DIR/pam.d/greetd" /etc/pam.d/greetd
+chmod 644 /etc/pam.d/greetd
+
+# Keep the login keyring password in sync with future login-password changes
+if ! grep -q "pam_gnome_keyring.so" /etc/pam.d/passwd; then
+    printf 'password\toptional\tpam_gnome_keyring.so\n' >> /etc/pam.d/passwd
+    echo "    Added pam_gnome_keyring to /etc/pam.d/passwd"
+fi
+
 # Ensure permissions
 chmod 644 /etc/greetd/config.toml
 chmod 644 /etc/greetd/hyprland.conf

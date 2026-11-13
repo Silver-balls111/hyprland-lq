@@ -1,0 +1,16 @@
+#%PAM-1.0
+
+# Deployed by greeter/install.sh (original preserved at /etc/pam.d/greetd.pambackup).
+# The two pam_gnome_keyring lines unlock the "login" keyring with the password
+# typed at the greeter: the auth module grabs the password the PAM stack already
+# collected, and the session module (auto_start) starts the keyring daemon in
+# the user's session and unlocks it. Both are optional — failures degrade to
+# a locked keyring, never to a failed login.
+
+auth       required     pam_securetty.so
+auth       requisite    pam_nologin.so
+auth       include      system-local-login
+auth       optional     pam_gnome_keyring.so
+account    include      system-local-login
+session    include      system-local-login
+session    optional     pam_gnome_keyring.so auto_start
