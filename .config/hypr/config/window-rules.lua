@@ -118,14 +118,14 @@ hl.window_rule({
 })
 
 -- Satty is a normal toplevel window (fed by hyprshot), NOT a layer surface —
--- layer rules match on namespace and would ignore the class (or match
--- everything). Match the exact app class from satty's StartupWMClass; blur
--- comes from decoration settings for regular windows.
 hl.window_rule({
     name = "satty",
-    match = { class = [[^com\.gabm\.satty$]] },
+    match = { class = [[^org\.satty\.satty$]] },
+    opacity = "1.0 override 1.0 override 1.0 override", -- active, inactive, fullscreen
+    dim_around = true,
     animation = "popin 80%",
 })
+
 hl.layer_rule({
     name = "vicinae",
     match = { namespace = "vicinae" },
