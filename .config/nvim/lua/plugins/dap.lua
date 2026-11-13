@@ -17,8 +17,8 @@ return {
         { "<leader>bc", function() require("dap").clear_breakpoints() end, desc = "Clear all breakpoints" },
         { "<leader>bu", function() require("dapui").toggle() end, desc = "Toggle debug UI" },
         { "<leader>be", function() require("dapui").eval() end, mode = { "n", "v" }, desc = "Eval expression" },
-        { "<leader>br", function() require("dap").repl.toggle() end, desc = "Toggle REPL" },
-        { "<leader>bR", function() require("dap").run_last() end, desc = "Run last config" },
+        { "<leader>bR", function() require("dap").repl.toggle() end, desc = "Toggle REPL" },
+        { "<leader>br", function() require("dap").run_last() end, desc = "Run last config" },
         { "<leader>bt", function() require("dap").terminate() end, desc = "Terminate session" },
     },
     config = function()
