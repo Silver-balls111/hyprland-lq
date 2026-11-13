@@ -11,77 +11,76 @@
 -----   Developer Fixes   ------
 --------------------------------
 hl.window_rule({
-    -- Ignore maximize requests from all apps. You'll probably like this.
-    name           = "suppress-maximize-events",
-    match          = { class = ".*" },
+	-- Ignore maximize requests from all apps. You'll probably like this.
+	name = "suppress-maximize-events",
+	match = { class = ".*" },
 
-    suppress_event = "maximize",
+	suppress_event = "maximize",
 })
 -- suppressMaximizeRule:set_enabled(false)
 
 hl.window_rule({
-    -- Fix some dragging issues with XWayland
-    name     = "fix-xwayland-drags",
-    match    = {
-        class      = "^$",
-        title      = "^$",
-        xwayland   = true,
-        float      = true,
-        fullscreen = false,
-        pin        = false,
-    },
+	-- Fix some dragging issues with XWayland
+	name = "fix-xwayland-drags",
+	match = {
+		class = "^$",
+		title = "^$",
+		xwayland = true,
+		float = true,
+		fullscreen = false,
+		pin = false,
+	},
 
-    no_focus = true,
+	no_focus = true,
 })
-
 
 --------------------------------
 -----   Window Rules      ------
 --------------------------------
 hl.window_rule({
-    name  = "move-hyprland-run",
-    match = { class = "hyprland-run" },
+	name = "move-hyprland-run",
+	match = { class = "hyprland-run" },
 
-    move  = "20 monitor_h-120",
-    float = true,
+	move = "20 monitor_h-120",
+	float = true,
 })
 
 hl.window_rule({
-    name = "nwg-look",
-    match = { title = "nwg-look" },
-    float = true,
+	name = "nwg-look",
+	match = { title = "nwg-look" },
+	float = true,
 })
 
 hl.window_rule({
-    name = "slint-preview",
-    match = { title = "Slint Live-Preview" },
-    float = true,
-    size    = {"(monitor_w*0.5)", "(monitor_h*0.5)"},
+	name = "slint-preview",
+	match = { title = "Slint Live-Preview" },
+	float = true,
+	size = { "(monitor_w*0.5)", "(monitor_h*0.5)" },
 })
 
 hl.window_rule({
-    name = "android-emulator",
-    match = { class = "Emulator" },
-    float = true,
+	name = "android-emulator",
+	match = { class = "Emulator" },
+	float = true,
 })
 
 hl.window_rule({
-    name   = "make file picker popups floating",
-    match  = {
-        title = [[^\s*(Open File|Open|Save As|Save|Export|Import|Choose File|
+	name = "make file picker popups floating",
+	match = {
+		title = [[^\s*(Open File|Open|Save As|Save|Export|Import|Choose File|
         Choose Download Folder|Rename)\s*$]],
-    },
-    float  = true,
-    center = true,
-    size    = {"(monitor_w*0.5)", "(monitor_h*0.5)"},
+	},
+	float = true,
+	center = true,
+	size = { "(monitor_w*0.5)", "(monitor_h*0.5)" },
 })
 
 hl.window_rule({
-    name = "file-pickers, screen-share popup etc",
-    match = { class = [[^\s*(xdg-desktop-portal-gtk|xdg-desktop-portal-hyprland)\s*$]] },
-    float = true,
-    center  = true,
-    size    = {"(monitor_w*0.5)", "(monitor_h*0.5)"},
+	name = "file-pickers, screen-share popup etc",
+	match = { class = [[^\s*(xdg-desktop-portal-gtk|xdg-desktop-portal-hyprland)\s*$]] },
+	float = true,
+	center = true,
+	size = { "(monitor_w*0.5)", "(monitor_h*0.5)" },
 })
 
 --------------------------------
@@ -96,40 +95,40 @@ hl.window_rule({
 -- overlayLayerRule:set_enabled(false)
 
 local qs_bar = hl.layer_rule({
-    name = "qs:top-bar",
-    match = { namespace = "quickshell:bar" },
-    blur = true,
-    ignore_alpha = 0.5,
+	name = "qs:top-bar",
+	match = { namespace = "quickshell:bar" },
+	blur = true,
+	ignore_alpha = 0.5,
 })
 qs_bar:set_enabled(true)
 
 hl.layer_rule({
-    name = "qs:wallswitch-dim",
-    match = { namespace = "quickshell:wallswitch" },
-    dim_around = true,
-    -- experiment to see which animation fits
-    animation = "slide right",
+	name = "qs:wallswitch-dim",
+	match = { namespace = "quickshell:wallswitch" },
+	dim_around = true,
+	-- experiment to see which animation fits
+	animation = "slide right",
 })
 
 hl.window_rule({
-    name    = "opaque-nautilus",
-    match   = { class = [[^org\.gnome\.Nautilus$]] },
-    opacity = "1.0 override 1.0 override 1.0 override", -- active, inactive, fullscreen
+	name = "opaque-nautilus",
+	match = { class = [[^org\.gnome\.Nautilus$]] },
+	opacity = "1.0 override 1.0 override 1.0 override", -- active, inactive, fullscreen
 })
 
 -- Satty is a normal toplevel window (fed by hyprshot), NOT a layer surface —
 hl.window_rule({
-    name = "satty",
-    match = { class = [[^org\.satty\.satty$]] },
-    opacity = "1.0 override 1.0 override 1.0 override", -- active, inactive, fullscreen
-    dim_around = true,
-    animation = "popin 80%",
+	name = "satty",
+	match = { class = [[^org\.satty\.satty$]] },
+	opacity = "1.0 override 1.0 override 1.0 override", -- active, inactive, fullscreen
+	dim_around = true,
+	animation = "popin 80%",
 })
 
 hl.layer_rule({
-    name = "vicinae",
-    match = { namespace = "vicinae" },
-    blur = true,
-    dim_around = true,
-    animation = "popin 80%",
+	name = "vicinae",
+	match = { namespace = "vicinae" },
+	blur = true,
+	dim_around = true,
+	animation = "popin 80%",
 })

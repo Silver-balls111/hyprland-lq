@@ -94,37 +94,37 @@ style = "Regular"
 # An installed color emoji font (e.g. Noto Color Emoji) is picked up automatically
 # as the last fallback, so emoji render without extra configuration. (0.22.0)
 fallback = [
-    "Noto Sans CJK SC",
-    # "Noto Sans CJK JP",
-    # "Noto Sans CJK TC",
-    # "Noto Sans CJK KR",
-    # "Noto Serif CJK JP",
-    # "Noto Serif JP",
-    # "IPAGothic",
-    # "IPAexGothic",
-    # "Source Han Sans",
-    # add or remove as needed - more fonts may make satty slower
+  "Noto Sans CJK SC",
+  # "Noto Sans CJK JP",
+  # "Noto Sans CJK TC",
+  # "Noto Sans CJK KR",
+  # "Noto Serif CJK JP",
+  # "Noto Serif JP",
+  # "IPAGothic",
+  # "IPAexGothic",
+  # "Source Han Sans",
+  # add or remove as needed - more fonts may make satty slower
 ]
 
 # Custom colours for the colour palette
 [color-palette]
 # These will be shown in the toolbar for quick selection
 palette = [
-    # RRGGBBAA format, where AA is the alpha channel
-    # (00 is fully transparent, ff is fully opaque)
-    "#f0932bff",
-    "#eb4d4bff",
-    "#6ab04cff",
-    "#22a6b3ff",
-    "#130f40FF",
-    # add or remove as needed
+  # RRGGBBAA format, where AA is the alpha channel
+  # (00 is fully transparent, ff is fully opaque)
+  "#f0932bff",
+  "#eb4d4bff",
+  "#6ab04cff",
+  "#22a6b3ff",
+  "#130f40FF",
+  # add or remove as needed
 ]
 
 # These will be available in the color picker as presets
 # Leave empty to use GTK's default
 custom = [
-    # "#a52a2a",
-    # "#ffd700",
-    # "#008000",
-    # add or remove as needed
+  # "#a52a2a",
+  # "#ffd700",
+  # "#008000",
+  # add or remove as needed
 ]

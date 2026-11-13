@@ -6,7 +6,6 @@
 local variables = require("config/variables")
 local mainMod = "ALT"
 
-
 ------------------------------------
 ------ Application Launchers -------
 ------------------------------------
@@ -18,13 +17,11 @@ hl.bind(mainMod .. " + C", hl.dsp.exec_cmd(variables.alt_editor))
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(variables.browser))
 hl.bind(mainMod .. " + SPACE", hl.dsp.exec_cmd(variables.launcher))
 
-
 ------------------------------------
 ------       Utilities       -------
 ------------------------------------
 hl.bind("PRINT", hl.dsp.exec_cmd(variables.ss_region))
 hl.bind("SHIFT + PRINT", hl.dsp.exec_cmd(variables.ss_screen))
-
 
 ------------------------------------
 ------       Quickshell       -------
@@ -34,7 +31,6 @@ hl.bind(mainMod .. " + X", hl.dsp.global("qs-bar:powermenu"))
 hl.bind("SUPER + L", hl.dsp.global("qs:lock"))
 hl.bind("SUPER + W", hl.dsp.global("qs:wallpaper-switcher"))
 
-
 ------------------------------------
 ------       Functions       -------
 ------------------------------------
@@ -42,11 +38,12 @@ hl.bind(mainMod .. " + W", hl.dsp.window.close())
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle" }))
 
-hl.bind(mainMod .. " + SHIFT + M",
-    hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"))
+hl.bind(
+	mainMod .. " + SHIFT + M",
+	hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'")
+)
 
 --hl.bind(mainMod .. " + P", hl.dsp.window.pseudo(), { description = "for dwindle mode"})
-
 
 ------------------------------------
 ------       Focus           -------
@@ -63,20 +60,18 @@ hl.bind(mainMod .. " + H", hl.dsp.focus({ direction = "right" }))
 hl.bind(mainMod .. " + K", hl.dsp.focus({ direction = "up" }))
 hl.bind(mainMod .. " + J", hl.dsp.focus({ direction = "down" }))
 
-
 ------------------------------------
 ------  Workspace Switching  -------
 ------------------------------------
 -- Switch workspaces with mainMod + [0-9]
 -- Move active window to a workspace with mainMod + SHIFT + [0-9]
 for i = 1, 10 do
-    local key = i % 10 -- 10 maps to key 0
-    hl.bind(mainMod .. " + " .. key, hl.dsp.focus({ workspace = i }))
-    hl.bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
+	local key = i % 10 -- 10 maps to key 0
+	hl.bind(mainMod .. " + " .. key, hl.dsp.focus({ workspace = i }))
+	hl.bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
 end
 
 hl.bind("SUPER + Tab", hl.dsp.focus({ workspace = "previous" }))
-
 
 ------------------------------------
 ------   Window Movement     -------
@@ -93,68 +88,64 @@ hl.bind(mainMod .. " + SHIFT + L", hl.dsp.window.swap({ direction = "r" }))
 hl.bind(mainMod .. " + SHIFT + K", hl.dsp.window.swap({ direction = "t" }))
 hl.bind(mainMod .. " + SHIFT + J", hl.dsp.window.swap({ direction = "b" }))
 
-
 ------------------------------------
 --------   Window Resize   ---------
 ------------------------------------
 -- Switch to a submap called `resize`.
 hl.bind(mainMod .. " + R", function()
-    hl.dispatch(hl.dsp.submap("resize"))
-    hl.notification.create({
-        text = "Resize Mode [ON]",
-        color = "rgb(40a02b)",
-        timeout = 4000
-    })
+	hl.dispatch(hl.dsp.submap("resize"))
+	hl.notification.create({
+		text = "Resize Mode [ON]",
+		color = "rgb(40a02b)",
+		timeout = 4000,
+	})
 end)
 
 -- Start a submap called "resize".
 hl.define_submap("resize", function()
+	-- Set repeating binds for resizing the active window.
+	hl.bind("l", hl.dsp.window.resize({ x = 10, y = 0, relative = true }), { repeating = true })
+	hl.bind("h", hl.dsp.window.resize({ x = -10, y = 0, relative = true }), { repeating = true })
+	hl.bind("k", hl.dsp.window.resize({ x = 0, y = -10, relative = true }), { repeating = true })
+	hl.bind("j", hl.dsp.window.resize({ x = 0, y = 10, relative = true }), { repeating = true })
 
-    -- Set repeating binds for resizing the active window.
-    hl.bind("l", hl.dsp.window.resize({ x = 10, y = 0, relative = true}), { repeating = true })
-    hl.bind("h", hl.dsp.window.resize({ x = -10, y = 0, relative = true}), { repeating = true })
-    hl.bind("k", hl.dsp.window.resize({ x = 0, y = -10, relative = true}), { repeating = true })
-    hl.bind("j", hl.dsp.window.resize({ x = 0, y = 10, relative = true}), { repeating = true })
-
-    -- Use `reset` to go back to the global submap
-    hl.bind("escape", function()
-        hl.dispatch(hl.dsp.submap("reset"))
-        hl.notification.create({
-            text = "Resize Mode [OFf]",
-            color = "rgb(d20f39)",
-            timeout = 4000
-        })
-    end)
+	-- Use `reset` to go back to the global submap
+	hl.bind("escape", function()
+		hl.dispatch(hl.dsp.submap("reset"))
+		hl.notification.create({
+			text = "Resize Mode [OFf]",
+			color = "rgb(d20f39)",
+			timeout = 4000,
+		})
+	end)
 end)
 
 -- MOVE MODE
 hl.bind(mainMod .. " + M", function()
-    hl.dispatch(hl.dsp.submap("move"))
-    hl.notification.create({
-        text = "Move Mode [ON]",
-        color = "rgb(40a02b)",
-        timeout = 4000
-    })
+	hl.dispatch(hl.dsp.submap("move"))
+	hl.notification.create({
+		text = "Move Mode [ON]",
+		color = "rgb(40a02b)",
+		timeout = 4000,
+	})
 end)
 
 hl.define_submap("move", function()
-    hl.bind("l", hl.dsp.window.move({ x = 15,  y = 0,  relative = true }), { repeating = true })
-    hl.bind("h", hl.dsp.window.move({ x = -15, y = 0,  relative = true }), { repeating = true })
-    hl.bind("k", hl.dsp.window.move({ x = 0,  y = -15, relative = true }), { repeating = true })
-    hl.bind("j", hl.dsp.window.move({ x = 0,  y = 15,  relative = true }), { repeating = true })
+	hl.bind("l", hl.dsp.window.move({ x = 15, y = 0, relative = true }), { repeating = true })
+	hl.bind("h", hl.dsp.window.move({ x = -15, y = 0, relative = true }), { repeating = true })
+	hl.bind("k", hl.dsp.window.move({ x = 0, y = -15, relative = true }), { repeating = true })
+	hl.bind("j", hl.dsp.window.move({ x = 0, y = 15, relative = true }), { repeating = true })
 
-    hl.bind("escape", function()
-        hl.dispatch(hl.dsp.submap("reset"))
-        hl.notification.create({
-            text = "Move Mode [OFf]",
-            color = "rgb(d20f39)",
-            timeout = 4000
-        })
-    end)
-
+	hl.bind("escape", function()
+		hl.dispatch(hl.dsp.submap("reset"))
+		hl.notification.create({
+			text = "Move Mode [OFf]",
+			color = "rgb(d20f39)",
+			timeout = 4000,
+		})
+	end)
 end)
 -- Keybinds further down will be global again...
-
 
 ------------------------------------
 ------     Scratchpad        -------
@@ -162,7 +153,6 @@ end)
 -- Example special workspace (scratchpad)
 hl.bind(mainMod .. " + S", hl.dsp.workspace.toggle_special("magic"))
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }))
-
 
 ------------------------------------
 ------       Mouse           -------
@@ -175,90 +165,72 @@ hl.bind(mainMod .. " + mouse_up", hl.dsp.focus({ workspace = "e-1" }))
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
-
 ------------------------------------
 ------       Gamemode        -------
 ------------------------------------
-hl.bind("SUPER + F1", function ()
-    local game_mode = (hl.get_config("animations.enabled") == false)
+hl.bind("SUPER + F1", function()
+	local game_mode = (hl.get_config("animations.enabled") == false)
 
-    if game_mode then
-        hl.exec_cmd("hyprctl reload")
-        hl.notification.create({
-            text = "Gamemode [OFF]",
-            color = "rgb(d20f39)",
-            timeout = 4000
-        })
-        return
-    end
+	if game_mode then
+		hl.exec_cmd("hyprctl reload")
+		hl.notification.create({
+			text = "Gamemode [OFF]",
+			color = "rgb(d20f39)",
+			timeout = 4000,
+		})
+		return
+	end
 
-    hl.config({
-        general = {
-            gaps_in = 0, gaps_out = 0, -- Disable gaps
-            border_size = 0,
-        },
+	hl.config({
+		general = {
+			gaps_in = 0,
+			gaps_out = 0, -- Disable gaps
+			border_size = 0,
+		},
 
-        animations = {
-            enabled = false, -- Disable animations
-        },
+		animations = {
+			enabled = false, -- Disable animations
+		},
 
-        -- Disable blur, shadow and window rounding
-        decoration = {
-            shadow = { enabled = false },
-            blur = { enabled = false },
-            rounding = 0,
-        }
-    })
+		-- Disable blur, shadow and window rounding
+		decoration = {
+			shadow = { enabled = false },
+			blur = { enabled = false },
+			rounding = 0,
+		},
+	})
 
-    hl.notification.create({
-        text = "Gamemode [ON]",
-        color = "rgb(40a02b)",
-        timeout = 4000
-    })
+	hl.notification.create({
+		text = "Gamemode [ON]",
+		color = "rgb(40a02b)",
+		timeout = 4000,
+	})
 end)
-
 
 ------------------------------------
 ------       Laptop          -------
 ------------------------------------
 -- Laptop multimedia keys for volume and LCD brightness
 hl.bind(
-    "XF86AudioRaiseVolume",
-    hl.dsp.exec_cmd("wpctl set-volume -l 2 @DEFAULT_AUDIO_SINK@ 5%+"),
-    { locked = true, repeating = true }
+	"XF86AudioRaiseVolume",
+	hl.dsp.exec_cmd("wpctl set-volume -l 2 @DEFAULT_AUDIO_SINK@ 5%+"),
+	{ locked = true, repeating = true }
 )
 hl.bind(
-    "XF86AudioLowerVolume",
-    hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"),
-    { locked = true, repeating = true }
+	"XF86AudioLowerVolume",
+	hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"),
+	{ locked = true, repeating = true }
 )
-hl.bind(
-    "XF86AudioMute",
-    hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"),
-    { locked = true }
-)
-hl.bind(
-    "XF86AudioMicMute",
-    hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"),
-    { locked = true }
-)
-hl.bind(
-    "XF86MonBrightnessUp",
-    hl.dsp.exec_cmd("brightnessctl -q set 5%+"),
-    { locked = true, repeating = true }
-)
-hl.bind(
-    "XF86MonBrightnessDown",
-    hl.dsp.exec_cmd("brightnessctl -q set 5%-"),
-    { locked = true, repeating = true }
-)
+hl.bind("XF86AudioMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"), { locked = true })
+hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"), { locked = true })
+hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("brightnessctl -q set 5%+"), { locked = true, repeating = true })
+hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl -q set 5%-"), { locked = true, repeating = true })
 
 -- Requires playerctl
 hl.bind("XF86AudioNext", hl.dsp.exec_cmd("playerctl next"), { locked = true })
 hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"), { locked = true })
 hl.bind("XF86AudioPause", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
 hl.bind("XF86AudioPlay", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
-
 
 ------------------------------------
 ------       Debug           -------
