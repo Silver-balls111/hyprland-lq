@@ -7,3 +7,5 @@
 .config/kitty/themes/
 .config/yazi/theme.toml
 .config/nvim/lazy-lock.json
+/.config/alacritty/colors.toml
+/.config/hypr/colors.lua
